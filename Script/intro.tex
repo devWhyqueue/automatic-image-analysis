@@ -1,0 +1,314 @@
+\section{Introduction to Automatic Image Analysis}
+
+The first lecture should give students a mental model for the whole course. We
+start from the central difficulty of vision, then move through the main
+processing levels, the recurring goals of the field, and the practical question
+of how to evaluate whether a vision system is actually reliable.
+
+\subsection{Lecture Aim and the Inverse Problem}
+
+This introductory lecture frames automatic image analysis as the problem of
+turning measurements into explanations. A digital image is easy to store: it is
+a grid of values. It is much harder to understand: we want to infer objects,
+surfaces, motion, geometry, lighting, and meaning from those values.
+
+The central message for the first session is therefore simple: computer vision
+is not just image enhancement. It is inference under uncertainty. The image is
+evidence; the scene that produced it is hidden.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=2.2cm,
+      box/.style={draw, rounded corners, align=center, minimum height=1cm,
+        minimum width=2.9cm},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[box, fill=blue!8] (scene) {3D scene\\objects, light, camera};
+    \node[box, fill=green!8, right=of scene] (image) {2D image\\pixel grid};
+    \node[box, fill=orange!10, right=of image] (meaning) {interpretation\\objects, depth, action};
+    \draw[arrow] (scene) -- (image)
+      node[midway, above=0.25cm, fill=white, inner sep=1pt]{image formation};
+    \draw[arrow] (image) -- (meaning)
+      node[midway, above=0.25cm, fill=white, inner sep=1pt]{inference};
+    \draw[arrow, dashed] (image.south west) to[bend right=45]
+      node[midway, below=0.35cm, fill=white, inner sep=1pt]{inverse problem}
+      (scene.south east);
+  \end{tikzpicture}
+  \caption{Computer vision tries to invert the image formation process: pixels
+  are observed, but the scene explanation is hidden.}
+\end{figure}
+
+\noindent
+Human vision feels immediate, but this ease is misleading. A camera records a
+two-dimensional projection of a three-dimensional world. During that projection,
+many causes are mixed together: object shape, material, illumination, viewpoint,
+occlusion, sensor noise, and motion. Different scenes can produce very similar
+images, so there is usually no unique answer that can be read directly from the
+pixels.
+
+This makes vision an inverse problem. The forward direction is comparatively
+clear: if we know the scene, the light, the camera, and the materials, we can
+model how an image is formed. The inverse direction asks us to go backward from
+image measurements to a plausible explanation of the world. That backward step
+requires assumptions, models, data, and algorithms.
+
+A compact way to write the forward model is
+\begin{equation}
+  I(x,y) = f\!\left(\Pi(X,Y,Z), L, M, C\right) + \varepsilon ,
+\end{equation}
+\noindent
+where $I(x,y)$ is the measured pixel value, $\Pi$ is the camera projection from
+3D to 2D, $L$ describes illumination, $M$ material and surface properties, $C$
+camera response, and $\varepsilon$ sensor noise. Vision asks for some hidden
+scene state $S$ from the image $I$:
+\begin{equation}
+  \hat{S} = \arg\max_S p(S \mid I)
+  = \arg\max_S p(I \mid S)\,p(S).
+\end{equation}
+\noindent
+The likelihood $p(I \mid S)$ says which images a scene would probably produce.
+The prior $p(S)$ encodes what kinds of scenes are plausible before seeing the
+image.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=0.9cm,
+      scene/.style={draw, trapezium, trapezium left angle=70,
+        trapezium right angle=110, minimum width=2.4cm, minimum height=1cm,
+        align=center, fill=blue!8},
+      img/.style={draw, minimum width=2.4cm, minimum height=1cm,
+        align=center, fill=green!8},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[scene] (s1) {Scene A\\small nearby object};
+    \node[scene, below=of s1] (s2) {Scene B\\large distant object};
+    \node[img, right=2.4cm of s1, yshift=-0.95cm] (img) {similar\\image size};
+    \draw[arrow] (s1.east) -- (img.west);
+    \draw[arrow] (s2.east) -- (img.west);
+  \end{tikzpicture}
+  \caption{Ambiguity is unavoidable: different scenes can lead to similar image
+  measurements. Priors and additional evidence help choose an explanation.}
+\end{figure}
+
+\paragraph{Instructor cue.}
+Show a familiar image and ask: what would the pixel array alone tell us? Then
+ask what a person immediately infers: objects, depth, material, intent, and
+context. The gap between those two answers is the subject of the course.
+
+\subsection{From Pixels to Interpretation}
+
+Automatic image analysis can be organized as a progression from low-level to
+high-level tasks.
+
+\begin{itemize}
+  \item Low-level processing improves or transforms image measurements, for
+        example denoising, filtering, contrast changes, and edge extraction.
+  \item Mid-level analysis groups measurements into more meaningful structures,
+        such as regions, contours, features, motion fields, or depth estimates.
+  \item High-level interpretation assigns semantic meaning, such as recognizing
+        objects, estimating scene layout, detecting abnormalities, or tracking
+        actions.
+\end{itemize}
+
+\noindent
+These levels are useful for teaching, but real systems often mix them. A modern
+recognition model may learn low-level filters and high-level categories inside
+one network. A classical pipeline may use carefully designed features followed
+by statistical inference. In both cases, the goal is the same: reduce the
+ambiguity of image data until a useful decision or description becomes possible.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Level & Typical question & Examples \\
+    \midrule
+    Low-level & What local measurements are reliable? &
+      denoising, gradients, edges \\
+    Mid-level & Which measurements belong together? &
+      regions, contours, motion, depth \\
+    High-level & What does the image mean? &
+      objects, scene layout, actions \\
+    \bottomrule
+  \end{tabular}
+  \caption{A teaching taxonomy for image-analysis tasks.}
+\end{table}
+
+\noindent
+One common low-level operation is convolution:
+\begin{equation}
+  (I * k)(x,y) = \sum_{u=-r}^{r}\sum_{v=-r}^{r} I(x-u,y-v)\,k(u,v).
+\end{equation}
+\noindent
+The same mathematical form can blur, sharpen, estimate derivatives, or detect
+local structure depending on the kernel $k$.
+
+The course can be read through three recurring goals: recognition,
+reconstruction, and reorganization.
+
+\paragraph{Recognition.}
+Recognition asks what is present and where it is. Examples include
+classification, detection, segmentation, reading text, identifying faces, or
+finding defects in industrial inspection.
+
+\paragraph{Reconstruction.}
+Reconstruction asks what spatial or physical structure produced the image.
+Examples include estimating depth, camera motion, three-dimensional shape, or
+the geometry of a scene from one or more images.
+
+\paragraph{Reorganization.}
+Reorganization changes the image representation so that later analysis becomes
+easier or the image becomes more useful to a person. Examples include
+registration, stitching, stabilization, denoising, super-resolution, and
+computational photography.
+
+These goals are connected. Recognition benefits from good representations;
+reconstruction needs reliable correspondences; reorganization often depends on
+understanding motion, geometry, or image formation.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      goal/.style={circle, draw, minimum size=2.8cm, align=center},
+      note/.style={align=center},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[goal, fill=red!8] (rec) {Recognition\\what and where?};
+    \node[goal, fill=blue!8, right=2.8cm of rec] (recon)
+      {Reconstruction\\what 3D structure?};
+    \node[goal, fill=green!8, below=1.8cm of $(rec)!0.5!(recon)$] (reorg)
+      {Reorganization\\better representation};
+    \draw[arrow] (rec) -- (recon);
+    \draw[arrow] (recon) -- (reorg);
+    \draw[arrow] (reorg) -- (rec);
+  \end{tikzpicture}
+  \caption{Recognition, reconstruction, and reorganization are not isolated
+  topics; each goal supplies information that can support the others.}
+\end{figure}
+
+\subsection{Models, Data, and Evaluation}
+
+Because images are ambiguous, vision systems need prior knowledge. Sometimes
+that knowledge is explicit: camera geometry, physical image formation, smooth
+surfaces, rigid motion, or probabilistic noise models. Sometimes it is learned
+from data: neural networks discover features and decision rules from many
+examples.
+
+Classical computer vision often emphasizes explicit models and engineered
+features. Modern deep learning often emphasizes learned representations and
+large datasets. The practical lesson is not that one replaces the other
+completely. Robust systems usually combine several kinds of knowledge:
+scientific models for image formation, statistical models for uncertainty,
+engineering choices for reliability, and data-driven learning for complex
+patterns that are hard to specify by hand.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.1cm}p{5cm}p{5cm}@{}}
+    \toprule
+    Source of knowledge & What it contributes & Risk if missing \\
+    \midrule
+    Physical model & Camera geometry, illumination, projection & Results may
+      violate how images are formed \\
+    Statistical model & Noise, uncertainty, priors, inference & The system may
+      overtrust ambiguous measurements \\
+    Engineering design & Robustness, speed, failure handling & The method may
+      work only in demonstrations \\
+    Data-driven learning & Features and decision rules from examples & Complex
+      visual variation may be underspecified \\
+    \bottomrule
+  \end{tabular}
+  \caption{A practical vision system usually combines several kinds of
+  knowledge.}
+\end{table}
+
+\noindent
+Computer vision is now a basic technology in many domains. Mobile phones use it
+for autofocus, panorama stitching, image stabilization, and computational
+photography. Medical systems use image analysis to support diagnosis and
+planning. Robots and autonomous vehicles use visual input for localization,
+mapping, and obstacle understanding. Manufacturing systems inspect parts, read
+codes, and detect defects. Media tools use vision for tracking, editing, visual
+effects, and three-dimensional capture.
+
+These applications also show why evaluation matters. A result that looks
+plausible on one example is not enough. Vision algorithms must be tested against
+noise, changing illumination, clutter, unusual viewpoints, occlusion, and data
+that differ from the training or development examples.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      evalstep/.style={draw, rounded corners, align=center, minimum width=3.2cm,
+        minimum height=1cm},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[evalstep, fill=green!8] (clean) {clean synthetic data\\known truth};
+    \node[evalstep, fill=yellow!12, right=of clean] (noise) {controlled stress\\noise, blur, light};
+    \node[evalstep, fill=red!8, right=of noise] (real) {real images\\clutter, bias, surprises};
+    \draw[arrow] (clean) -- (noise);
+    \draw[arrow] (noise) -- (real);
+  \end{tikzpicture}
+  \caption{Evaluation should move from controlled correctness toward real-world
+  robustness.}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=0.7cm,
+      block/.style={draw, rounded corners, align=center, minimum width=2.9cm,
+        minimum height=0.95cm},
+      small/.style={draw, rounded corners, align=center, minimum width=2.35cm,
+        minimum height=0.85cm},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[block, fill=blue!8] (pixels) {image measurements\\pixels, gradients, features};
+    \node[block, fill=orange!10, right=of pixels] (models)
+      {prior knowledge\\physics, statistics, data};
+    \node[block, fill=green!8, right=of models] (output)
+      {useful output\\label, geometry, improved image};
+
+    \node[small, fill=red!8, below=1.1cm of pixels] (rec)
+      {recognition\\what is where?};
+    \node[small, fill=blue!8, below=1.1cm of models] (recon)
+      {reconstruction\\what 3D scene?};
+    \node[small, fill=green!8, below=1.1cm of output] (reorg)
+      {reorganization\\better representation};
+
+    \draw[arrow] (pixels) -- (models);
+    \draw[arrow] (models) -- (output);
+    \draw[arrow] (pixels) -- (rec);
+    \draw[arrow] (models) -- (recon);
+    \draw[arrow] (output) -- (reorg);
+  \end{tikzpicture}
+  \caption{A compact summary of the introductory framing: measurements become
+  useful outputs only after they are combined with assumptions, models, and
+  data.}
+\end{figure}
+
+\subsection{Course Roadmap}
+
+The first part of the course builds the foundations: image representation,
+filtering, features, transformations, and the basic language of image formation.
+The next part introduces learning-based methods, especially neural networks, as
+a way to learn visual representations from data. Later topics connect these
+ideas to object models, probabilistic estimation, and higher-level recognition
+or reconstruction tasks.
+
+Throughout the course, keep returning to three questions:
+
+\begin{enumerate}
+  \item What information is actually present in the image measurements?
+  \item What assumptions are needed to infer the hidden scene or decision?
+  \item How can we test whether the algorithm works beyond the example in front
+        of us?
+\end{enumerate}
+
+\noindent
+Automatic image analysis starts with pixels but does not end there. Its real
+task is to connect images to explanations: what is in the scene, how it is
+arranged, how it changes, and what action or decision should follow. The rest of
+the course develops the tools needed to make that connection systematically.
