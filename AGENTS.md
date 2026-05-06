@@ -3,18 +3,18 @@
 ## Project Context
 
 This repository contains course material for Automatic Image Analysis and a
-LaTeX script project in `Script/`. The script should become a lecture-style
+LaTeX script project in `Script/`. The script should become an explanatory
 learning document, not just a plain summary.
 
 ## LaTeX Script Preferences
 
 - Compile only one PDF output for the script: `Script/main.pdf`.
 - Keep `Script/main.tex` as the root LaTeX document.
-- Put larger chapter or lecture bodies in separate `.tex` files, then include
+- Put larger chapter or unit bodies in separate `.tex` files, then include
   them from `main.tex` with `\input{...}`. Do not give included files their own
   document preamble or compile them into separate PDFs.
 - Keep section hierarchy restrained. Use top-level sections for real document
-  chapters or major lecture units. Inside a lecture, use `\subsection{...}` for
+  chapters or major units. Inside a chapter or unit, use `\subsection{...}` for
   meaningful blocks, but keep each subsection substantial enough to preserve
   reading flow. Do not create a new subsection after only one short paragraph;
   combine closely related points into a larger subsection instead.
@@ -26,12 +26,12 @@ learning document, not just a plain summary.
 
 ## Teaching Style
 
-- Write in a lecture-script style: explanatory, direct, and useful for studying.
+- Write in an explanatory, direct style that is useful for studying.
+- Avoid meta-references to the document as a script, lecture, lecture notes, or
+  material based on a lecture. Present the course contents directly.
 - Prefer intuitive explanations before formal notation.
 - Use figures, schematic diagrams, tables, and equations to make concepts more
   concrete.
-- Add short instructor cues when they help explain how a point could be taught
-  or discussed.
 - Avoid overly dense generated infographics. Prefer simple, local TikZ diagrams
   that explain one idea clearly.
 - For NotebookLM-generated artifacts, use them as source material or references,

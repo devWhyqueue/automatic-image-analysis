@@ -1,20 +1,29 @@
 \section{Introduction to Automatic Image Analysis}
 
-The first lecture should give students a mental model for the whole course. We
-start from the central difficulty of vision, then move through the main
-processing levels, the recurring goals of the field, and the practical question
-of how to evaluate whether a vision system is actually reliable.
+Automatic image analysis starts from the central difficulty of vision, then
+moves through the main processing levels, the recurring goals of the field, and
+the practical question of how to evaluate whether a vision system is actually
+reliable.
 
 \subsection{Lecture Aim and the Inverse Problem}
 
-This introductory lecture frames automatic image analysis as the problem of
-turning measurements into explanations. A digital image is easy to store: it is
-a grid of values. It is much harder to understand: we want to infer objects,
-surfaces, motion, geometry, lighting, and meaning from those values.
+Automatic image analysis is the problem of turning measurements into
+explanations. A digital image is easy to store: it is a grid of values. It is
+much harder to understand: we want to infer objects, surfaces, motion, geometry,
+lighting, and meaning from those values.
 
-The central message for the first session is therefore simple: computer vision
-is not just image enhancement. It is inference under uncertainty. The image is
-evidence; the scene that produced it is hidden.
+Computer vision is the computational study of how useful descriptions of the
+visual world can be recovered from images and video. The description may be
+semantic, such as ``there is a pedestrian in front of the car''; geometric, such
+as ``this surface is two meters away''; or operational, such as ``reject this
+part because it contains a defect''. This definition is deliberately broader
+than object recognition. A vision system may label an image, reconstruct a
+three-dimensional scene, align several images, estimate motion, improve an image
+for a human observer, or supply measurements for a larger decision-making
+system.
+
+Computer vision is therefore not just image enhancement. It is inference under
+uncertainty. The image is evidence; the scene that produced it is hidden.
 
 \begin{figure}[ht]
   \centering
@@ -92,10 +101,10 @@ image.
   measurements. Priors and additional evidence help choose an explanation.}
 \end{figure}
 
-\paragraph{Instructor cue.}
-Show a familiar image and ask: what would the pixel array alone tell us? Then
-ask what a person immediately infers: objects, depth, material, intent, and
-context. The gap between those two answers is the subject of the course.
+The gap between the pixel array and the human interpretation is the essential
+problem. A person immediately infers objects, depth, material, intent, and
+context, while the measured image itself only contains sampled intensities or
+colors.
 
 \subsection{From Pixels to Interpretation}
 
@@ -104,12 +113,17 @@ high-level tasks.
 
 \begin{itemize}
   \item Low-level processing improves or transforms image measurements, for
-        example denoising, filtering, contrast changes, and edge extraction.
+        example acquisition, sampling, denoising, filtering, contrast changes,
+        and edge extraction. Its typical mapping is image to image, or scene to
+        image when the acquisition process is included.
   \item Mid-level analysis groups measurements into more meaningful structures,
-        such as regions, contours, features, motion fields, or depth estimates.
+        such as regions, contours, features, segments, motion fields, or depth
+        estimates. It is often the bridge from image measurements to feature
+        descriptions.
   \item High-level interpretation assigns semantic meaning, such as recognizing
         objects, estimating scene layout, detecting abnormalities, or tracking
-        actions.
+        actions. Its typical mapping is from features or image evidence to
+        object models, object detections, categories, or decisions.
 \end{itemize}
 
 \noindent
@@ -121,20 +135,70 @@ ambiguity of image data until a useful decision or description becomes possible.
 
 \begin{table}[ht]
   \centering
-  \begin{tabular}{@{}lll@{}}
+  \begin{tabular}{@{}p{2.0cm}p{3.0cm}p{4.2cm}p{4.0cm}@{}}
     \toprule
-    Level & Typical question & Examples \\
+    Level & Typical mapping & Typical question & Examples \\
     \midrule
-    Low-level & What local measurements are reliable? &
+    Low-level & scene/image $\rightarrow$ image &
+      What local measurements are reliable? &
       denoising, gradients, edges \\
-    Mid-level & Which measurements belong together? &
-      regions, contours, motion, depth \\
-    High-level & What does the image mean? &
+    Mid-level & image $\rightarrow$ features &
+      Which measurements belong together? &
+      regions, contours, segments, motion \\
+    High-level & features/image $\rightarrow$ objects &
+      What does the image mean? &
       objects, scene layout, actions \\
     \bottomrule
   \end{tabular}
   \caption{A teaching taxonomy for image-analysis tasks.}
 \end{table}
+
+\noindent
+The same hierarchy can also be read as a contrast between bottom-up and
+top-down processing. A bottom-up system starts with the image data and builds
+larger hypotheses from local evidence: pixels become edges, edges become
+contours, contours become regions, and regions become object candidates. This
+is data-driven and attractive because the image itself constrains the result.
+Its weakness is that local evidence is often ambiguous or missing.
+
+Top-down processing starts from a model, context, task goal, or prior
+expectation and asks how the image should be interpreted under that hypothesis.
+This is knowledge-driven: a rough object model can guide the search for parts,
+a scene context can make one interpretation more plausible than another, and a
+classifier can project learned category knowledge onto the image. Top-down
+processing is powerful because it uses what is already known, but it can also
+produce confident misinterpretations when the prior is wrong. Practical systems
+therefore often use a mixed mode: bottom-up evidence proposes or constrains
+hypotheses, while top-down models select, refine, or reject them.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=0.85cm,
+      box/.style={draw, rounded corners, align=center, minimum width=2.75cm,
+        minimum height=0.9cm},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[box, fill=green!8] (pixels) {pixels};
+    \node[box, fill=green!8, right=of pixels] (features) {features};
+    \node[box, fill=green!8, right=of features] (parts) {parts or regions};
+    \node[box, fill=orange!12, right=of parts] (object) {object hypothesis};
+    \node[box, fill=blue!8, above=1.0cm of parts] (model) {model, context, task};
+
+    \draw[arrow] (pixels) -- (features);
+    \draw[arrow] (features) -- (parts);
+    \draw[arrow] (parts) -- (object);
+    \draw[arrow] (model) -- (features)
+      node[midway, left=0.12cm, fill=white, inner sep=1pt, font=\small]
+      {top-down};
+    \draw[arrow] (model) -- (object);
+    \node[align=center, below=0.2cm of features, font=\small]
+      {bottom-up evidence};
+  \end{tikzpicture}
+  \caption{Bottom-up processing builds interpretations from image evidence.
+  Top-down processing uses models and context to guide or correct the
+  interpretation.}
+\end{figure}
 
 \noindent
 One common low-level operation is convolution:
@@ -145,7 +209,7 @@ One common low-level operation is convolution:
 The same mathematical form can blur, sharpen, estimate derivatives, or detect
 local structure depending on the kernel $k$.
 
-The course can be read through three recurring goals: recognition,
+Computer vision can be organized around three recurring goals: recognition,
 reconstruction, and reorganization.
 
 \paragraph{Recognition.}
@@ -168,6 +232,26 @@ These goals are connected. Recognition benefits from good representations;
 reconstruction needs reliable correspondences; reorganization often depends on
 understanding motion, geometry, or image formation.
 
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.3cm}p{4.8cm}p{5.2cm}@{}}
+    \toprule
+    Area & Main transformation & Typical examples \\
+    \midrule
+    Digital image processing & image $\rightarrow$ image & enhancement,
+      restoration, filtering, compression \\
+    Photogrammetry and geometry & image(s) $\rightarrow$ 3D model & camera
+      calibration, depth, surface reconstruction, mapping \\
+    Automatic image analysis & image $\rightarrow$ object model or detection &
+      feature extraction, segmentation, object categorization, recognition \\
+    \bottomrule
+  \end{tabular}
+  \caption{Automatic image analysis is closest to the recognition branch of
+  computer vision: it studies how image evidence becomes object-level
+  descriptions, while still using processing and geometric ideas when they
+  support that goal.}
+\end{table}
+
 \begin{figure}[ht]
   \centering
   \begin{tikzpicture}[
@@ -188,6 +272,75 @@ understanding motion, geometry, or image formation.
   topics; each goal supplies information that can support the others.}
 \end{figure}
 
+\noindent
+Another useful taxonomy separates the vocabulary of the field by the kind of
+question being asked. Some terms describe the \emph{input} and its formation,
+some describe \emph{representations} computed from the image, some describe
+\emph{tasks}, and some describe the \emph{knowledge} used to resolve ambiguity.
+Keeping these groups separate helps avoid a common beginner confusion: a feature,
+a model, a task, and an application are not the same kind of object.
+
+\begin{figure}[ht]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+      node distance=0.85cm and 0.95cm,
+      root/.style={draw, rounded corners, align=center, minimum width=3.4cm,
+        minimum height=0.9cm, fill=gray!10},
+      group/.style={draw, rounded corners, align=center, minimum width=3.5cm,
+        minimum height=0.9cm},
+      item/.style={draw, align=center, minimum width=3.1cm, minimum height=0.72cm,
+        font=\small},
+      arrow/.style={-{Latex[length=2.4mm]}, thick}
+    ]
+    \node[root] (cv) {computer vision\\images to explanations};
+
+    \node[group, fill=blue!8, below left=1.0cm and 5.5cm of cv] (input)
+      {image formation};
+    \node[group, fill=green!8, below left=1.0cm and 1.7cm of cv] (repr)
+      {representations};
+    \node[group, fill=orange!12, below right=1.0cm and 1.7cm of cv] (tasks)
+      {tasks};
+    \node[group, fill=red!8, below right=1.0cm and 5.5cm of cv] (knowledge)
+      {knowledge};
+
+    \node[item, below=of input] (inputa) {scene, light, camera};
+    \node[item, below=of inputa] (inputb) {projection, sampling, noise};
+
+    \node[item, below=of repr] (repra) {pixels, color, gradients};
+    \node[item, below=of repra] (reprb) {features, regions, motion};
+    \node[item, below=of reprb] (reprc) {depth, pose, 3D shape};
+
+    \node[item, below=of tasks] (taska) {recognition};
+    \node[item, below=of taska] (taskb) {reconstruction};
+    \node[item, below=of taskb] (taskc) {reorganization};
+
+    \node[item, below=of knowledge] (knowa) {geometry and physics};
+    \node[item, below=of knowa] (knowb) {probability and priors};
+    \node[item, below=of knowb] (knowc) {learned models and data};
+
+    \draw[arrow] (cv) -- (input);
+    \draw[arrow] (cv) -- (repr);
+    \draw[arrow] (cv) -- (tasks);
+    \draw[arrow] (cv) -- (knowledge);
+    \draw[arrow] (input) -- (inputa);
+    \draw[arrow] (inputa) -- (inputb);
+    \draw[arrow] (repr) -- (repra);
+    \draw[arrow] (repra) -- (reprb);
+    \draw[arrow] (reprb) -- (reprc);
+    \draw[arrow] (tasks) -- (taska);
+    \draw[arrow] (taska) -- (taskb);
+    \draw[arrow] (taskb) -- (taskc);
+    \draw[arrow] (knowledge) -- (knowa);
+    \draw[arrow] (knowa) -- (knowb);
+    \draw[arrow] (knowb) -- (knowc);
+  \end{tikzpicture}%
+  }
+  \caption{A compact taxonomy of introductory computer-vision terms. The field
+  connects image formation, intermediate representations, task goals, and prior
+  knowledge.}
+\end{figure}
+
 \subsection{Models, Data, and Evaluation}
 
 Because images are ambiguous, vision systems need prior knowledge. Sometimes
@@ -203,6 +356,41 @@ completely. Robust systems usually combine several kinds of knowledge:
 scientific models for image formation, statistical models for uncertainty,
 engineering choices for reliability, and data-driven learning for complex
 patterns that are hard to specify by hand.
+
+\begin{figure}[ht]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+      milestone/.style={draw, rounded corners, align=center, minimum width=3cm,
+        minimum height=1.05cm, font=\small},
+      arrow/.style={-{Latex[length=3mm]}, thick}
+    ]
+    \node[milestone, fill=gray!10] (m1960) {1960s--1970s\\blocks world\\edges, line labeling};
+    \node[milestone, fill=blue!8, right=0.7cm of m1960] (m1980)
+      {1980s\\quantitative vision\\pyramids, shape-from-X};
+    \node[milestone, fill=green!8, right=0.7cm of m1980] (m1990)
+      {1990s\\multiple views\\stereo, motion, segmentation};
+    \node[milestone, fill=orange!12, right=0.7cm of m1990] (m2000)
+      {2000s\\features and graphics\\recognition, stitching};
+    \node[milestone, fill=red!8, right=0.7cm of m2000] (m2010)
+      {2010s--today\\deep learning\\large data, sensors};
+    \draw[arrow] (m1960) -- (m1980);
+    \draw[arrow] (m1980) -- (m1990);
+    \draw[arrow] (m1990) -- (m2000);
+    \draw[arrow] (m2000) -- (m2010);
+  \end{tikzpicture}%
+  }
+  \caption{A brief historical timeline. The emphasis moved from hand-built
+  geometric reasoning, through quantitative reconstruction and engineered
+  features, toward large-scale learned representations and integrated sensing.}
+\end{figure}
+
+\noindent
+The timeline is not a story of one idea simply replacing another. Edge
+operators, camera geometry, variational estimation, probabilistic models,
+feature matching, and neural networks all remain useful. What changes over time
+is the balance between explicit modeling, available computation, available
+training data, and the kinds of applications that can be deployed reliably.
 
 \begin{table}[ht]
   \centering
@@ -225,13 +413,38 @@ patterns that are hard to specify by hand.
 \end{table}
 
 \noindent
-Computer vision is now a basic technology in many domains. Mobile phones use it
-for autofocus, panorama stitching, image stabilization, and computational
-photography. Medical systems use image analysis to support diagnosis and
-planning. Robots and autonomous vehicles use visual input for localization,
-mapping, and obstacle understanding. Manufacturing systems inspect parts, read
-codes, and detect defects. Media tools use vision for tracking, editing, visual
-effects, and three-dimensional capture.
+Computer vision is now a basic technology in many domains. It is more useful to
+name the application categories than to memorize a long list of products:
+consumer imaging and media, medicine and life sciences, industry and logistics,
+robotics and autonomous systems, remote sensing and mapping, document analysis,
+security and biometrics, and scientific measurement. The tasks differ, but the
+same conceptual questions recur: what image evidence is available, what
+assumptions make the interpretation possible, and what failure cases matter in
+the application context?
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.6cm}p{4.8cm}p{5.1cm}@{}}
+    \toprule
+    Application category & Typical vision output & Main reliability concern \\
+    \midrule
+    Consumer and media & enhanced images, alignment, tracking & visual quality
+      and robustness across devices \\
+    Medicine and life sciences & measurements, segmentations, suspected findings
+      & uncertainty, bias, and clinical validation \\
+    Industry and logistics & defects, codes, counts, object poses & speed,
+      repeatability, and rare failures \\
+    Robotics and autonomy & localization, obstacles, maps, actions & safety
+      under changing environments \\
+    Remote sensing and mapping & land cover, 3D structure, change detection &
+      scale, resolution, and registration accuracy \\
+    Documents and biometrics & text, identity cues, authenticity signals &
+      privacy, fairness, and adversarial misuse \\
+    \bottomrule
+  \end{tabular}
+  \caption{Categorical application areas are easier to study than isolated
+  product examples because they expose recurring reliability questions.}
+\end{table}
 
 These applications also show why evaluation matters. A result that looks
 plausible on one example is not enough. Vision algorithms must be tested against
@@ -289,16 +502,24 @@ that differ from the training or development examples.
   data.}
 \end{figure}
 
-\subsection{Course Roadmap}
+\subsection{Topic Roadmap}
 
-The first part of the course builds the foundations: image representation,
-filtering, features, transformations, and the basic language of image formation.
-The next part introduces learning-based methods, especially neural networks, as
-a way to learn visual representations from data. Later topics connect these
-ideas to object models, probabilistic estimation, and higher-level recognition
-or reconstruction tasks.
+Automatic image analysis is narrower than the whole field of computer vision.
+It uses image processing tools and needs some geometric and probabilistic
+reasoning, but the main line is automatic interpretation: how images are
+transformed into features, segments, object models, detections, categories, and
+evaluated decisions.
 
-Throughout the course, keep returning to three questions:
+The foundations are image representation, filtering, features, transformations,
+and the basic language of image formation. These topics supply the bottom-up
+evidence used later. Segmentation, clustering, and feature extraction provide
+mid-level descriptions that make object-level reasoning possible. Learning-based
+methods, especially neural networks, show how useful representations and
+classifiers can be estimated from data. Object models, probabilistic estimation,
+and higher-level recognition tasks connect these pieces; reconstruction appears
+where it helps explain image formation, geometry, or the limits of recognition.
+
+Three questions recur throughout automatic image analysis:
 
 \begin{enumerate}
   \item What information is actually present in the image measurements?
@@ -310,5 +531,4 @@ Throughout the course, keep returning to three questions:
 \noindent
 Automatic image analysis starts with pixels but does not end there. Its real
 task is to connect images to explanations: what is in the scene, how it is
-arranged, how it changes, and what action or decision should follow. The rest of
-the course develops the tools needed to make that connection systematically.
+arranged, how it changes, and what action or decision should follow.
