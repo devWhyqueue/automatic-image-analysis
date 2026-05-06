@@ -1,0 +1,291 @@
+\section{Neural Networks and Backpropagation}
+
+Neural networks are one way to replace manually designed decision rules by
+learned functions. For image analysis, the input may be an image, a patch, or a
+feature vector, and the output may be a class score, a probability, a
+segmentation label, or another task-specific prediction. The central idea is
+simple: compose many parameterized transformations and fit their parameters
+from examples.
+
+Szeliski's treatment of deep learning, especially the part on deep neural
+networks and backpropagation, is a useful companion for this topic. The focus
+here is narrower: understand the computational structure of a feed-forward
+network and why backpropagation is the efficient way to compute the gradients
+needed for training.
+
+\subsection{From Perceptrons to Multilayer Networks}
+
+A perceptron is a linear classifier. Given an input vector $x$, weights $w$,
+and bias $b$, it predicts a binary label by thresholding an affine score:
+\begin{equation}
+  f(x) =
+  \begin{cases}
+    1, & w^\top x + b > 0,\\
+    -1, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+\noindent
+The decision boundary is the hyperplane $w^\top x + b = 0$. This makes the
+perceptron easy to interpret, but also limited: if the classes cannot be
+separated by a linear boundary, the standard perceptron cannot solve the
+problem. The XOR problem is the usual minimal example.
+
+During perceptron training, an incorrectly predicted example changes the
+weights in the direction of the input:
+\begin{equation}
+  w_i^{t+1} = w_i^t + \eta\left(y - f(x)\right)x_i ,
+\end{equation}
+\noindent
+where $\eta$ is the learning rate. The rule is useful historically because it
+already shows the pattern of learning from prediction error, but modern neural
+networks need a smoother and more general gradient-based view.
+
+A multilayer perceptron (MLP) overcomes the purely linear limitation by stacking
+several affine maps and nonlinear activation functions. For layer $l$,
+\begin{equation}
+  h^l = W^l x^l + b^l,\qquad
+  y^l = \phi(h^l),\qquad
+  x^{l+1}=y^l .
+\end{equation}
+\noindent
+Without the nonlinearity $\phi$, stacking layers would still collapse into one
+linear transformation. The nonlinearities make it possible to build complex
+decision boundaries from many simple units.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=1.15cm,
+      unit/.style={circle, draw, minimum size=0.52cm, inner sep=0pt},
+      label/.style={align=center, font=\small},
+      arrow/.style={-{Latex[length=2.2mm]}, thick}
+    ]
+    \node[unit, fill=green!8] (x1) {};
+    \node[unit, fill=green!8, below=0.55cm of x1] (x2) {};
+    \node[unit, fill=green!8, below=0.55cm of x2] (x3) {};
+
+    \node[unit, fill=blue!8, right=1.5cm of x1, yshift=-0.28cm] (h11) {};
+    \node[unit, fill=blue!8, below=0.55cm of h11] (h12) {};
+    \node[unit, fill=blue!8, below=0.55cm of h12] (h13) {};
+
+    \node[unit, fill=blue!8, right=1.5cm of h11] (h21) {};
+    \node[unit, fill=blue!8, below=0.55cm of h21] (h22) {};
+    \node[unit, fill=blue!8, below=0.55cm of h22] (h23) {};
+
+    \node[unit, fill=orange!12, right=1.5cm of h22] (out) {};
+
+    \foreach \a in {x1,x2,x3} {
+      \foreach \b in {h11,h12,h13} {
+        \draw[arrow, gray!70] (\a) -- (\b);
+      }
+    }
+    \foreach \a in {h11,h12,h13} {
+      \foreach \b in {h21,h22,h23} {
+        \draw[arrow, gray!70] (\a) -- (\b);
+      }
+    }
+    \foreach \a in {h21,h22,h23} {
+      \draw[arrow, gray!70] (\a) -- (out);
+    }
+
+    \node[label, above=0.28cm of x1] {input};
+    \node[label, above=0.28cm of h11] {hidden};
+    \node[label, above=0.28cm of h21] {hidden};
+    \node[label, above=0.28cm of out] {output};
+  \end{tikzpicture}
+  \caption{A feed-forward network composes affine transformations and
+  nonlinearities. Training changes the weights on the connections.}
+\end{figure}
+
+\noindent
+Common activation functions include the logistic sigmoid, hyperbolic tangent,
+and rectified linear unit:
+\begin{align}
+  \sigma(z) &= \frac{1}{1 + e^{-z}},
+  & \sigma'(z) &= \sigma(z)\left(1-\sigma(z)\right),\\
+  \tanh'(z) &= 1-\tanh^2(z),
+  & \operatorname{ReLU}(z) &= \max(0,z).
+\end{align}
+\noindent
+For ReLU, the derivative is $1$ for positive inputs and $0$ for negative
+inputs; at zero one chooses a convenient subgradient in implementations. This
+simple derivative is one reason ReLU-style activations are computationally
+attractive.
+
+\subsection{Losses, Optimization, and the Need for Gradients}
+
+Training starts with examples $(x_i,y_i)$ and a network $f_\theta$ with
+parameters $\theta$, meaning all weights and biases. A loss function measures
+how bad a prediction is. Over a dataset, the empirical objective is
+\begin{equation}
+  L(\theta) =
+  \sum_{i=1}^{N} \ell\!\left(f_\theta(x_i), y_i\right).
+\end{equation}
+\noindent
+For regression, $\ell$ may be a squared error. For classification, it is often
+cross-entropy applied to class scores or probabilities. The exact loss depends
+on the task, but the training problem has the same form: find parameters that
+make the loss small.
+
+Stochastic gradient descent updates parameters using a small batch
+$\mathcal{B}_t$ instead of the full dataset:
+\begin{equation}
+  \theta_{t+1}
+  =
+  \theta_t
+  -
+  \alpha
+  \sum_{i\in\mathcal{B}_t}
+  \frac{\partial \ell_i(\theta_t)}{\partial \theta},
+\end{equation}
+\noindent
+where $\alpha$ is the learning rate. The practical difficulty is not writing
+this update down; it is computing the partial derivatives for millions of
+parameters quickly and without duplicating work. Backpropagation solves exactly
+that problem.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.0cm}p{5.1cm}p{5.1cm}@{}}
+    \toprule
+    Component & Role in the network & Training question \\
+    \midrule
+    Weights and biases & Store the adjustable model parameters &
+      How should each parameter change to reduce the loss? \\
+    Activations & Introduce nonlinear transformations between layers &
+      Which units are active and how do they transmit gradients? \\
+    Loss function & Converts predictions and targets into one scalar &
+      What does ``better'' mean for this task? \\
+    Optimizer & Turns gradients into parameter updates &
+      How large and in which direction should the next step be? \\
+    \bottomrule
+  \end{tabular}
+  \caption{Training a neural network requires both a model architecture and a
+  procedure for turning prediction errors into parameter updates.}
+\end{table}
+
+\subsection{Backpropagation}
+
+Backpropagation is an efficient application of the chain rule to a computational
+graph. The forward pass computes the network output and stores intermediate
+quantities. The backward pass starts from the derivative of the loss with
+respect to the output and propagates sensitivity information back through the
+same operations in reverse order.
+
+For a layer
+\begin{equation}
+  f_k = \beta_k + \Omega_k h_k,
+\end{equation}
+\noindent
+the gradient with respect to a weight matrix has the structure
+\begin{equation}
+  \frac{\partial \ell_i}{\partial \Omega_k}
+  =
+  \frac{\partial \ell_i}{\partial f_k}\,h_k^\top .
+\end{equation}
+\noindent
+This formula captures a useful intuition from the lecture: the effect of a
+weight depends both on the upstream error signal and on the activation feeding
+into that weight. If the previous activation is doubled, the same small weight
+change has twice the local effect.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=1.15cm,
+      box/.style={draw, rounded corners, align=center, minimum width=2.2cm,
+        minimum height=0.8cm},
+      arrow/.style={-{Latex[length=2.6mm]}, thick}
+    ]
+    \node[box, fill=green!8] (x) {$x$};
+    \node[box, fill=blue!8, right=of x] (h1) {$h_1$};
+    \node[box, fill=blue!8, right=of h1] (h2) {$h_2$};
+    \node[box, fill=orange!12, right=of h2] (yhat) {$f_\theta(x)$};
+    \node[box, fill=red!8, right=of yhat] (loss) {$\ell$};
+
+    \draw[arrow] (x) -- (h1);
+    \draw[arrow] (h1) -- (h2);
+    \draw[arrow] (h2) -- (yhat);
+    \draw[arrow] (yhat) -- (loss);
+
+    \draw[arrow, dashed] (loss.south) to[out=-90,in=-90]
+      node[midway, below=0.35cm, fill=white, inner sep=1pt]{gradients}
+      (yhat.south);
+    \draw[arrow, dashed] (yhat.south) to[out=-90,in=-90] (h2.south);
+    \draw[arrow, dashed] (h2.south) to[out=-90,in=-90] (h1.south);
+  \end{tikzpicture}
+  \caption{The forward pass evaluates the network from left to right. The
+  backward pass propagates derivatives from the loss back through the stored
+  intermediate quantities.}
+\end{figure}
+
+\noindent
+For ReLU hidden units, the backward recurrence includes the pointwise derivative
+of the activation:
+\begin{equation}
+  \frac{\partial \ell_i}{\partial f_{k-1}}
+  =
+  \mathbb{I}[f_{k-1} > 0]
+  \odot
+  \left(
+    \Omega_k^\top
+    \frac{\partial \ell_i}{\partial f_k}
+  \right),
+\end{equation}
+\noindent
+where $\odot$ denotes elementwise multiplication. The indicator gates the
+gradient: inactive ReLU units do not pass local gradient information backward.
+
+The important point is not to memorize every indexed expression, but to know
+what must be stored and what is reused. The activations from the forward pass
+are needed during the backward pass. This makes backpropagation efficient, but
+also memory-hungry for large networks.
+
+\subsection{Automatic Differentiation and Practical Training}
+
+Modern deep-learning libraries implement backpropagation through automatic
+differentiation. A model is represented as an acyclic graph of operations. Each
+operation knows how to compute its output in the forward direction and how to
+propagate derivatives in the reverse direction. The user specifies the model,
+the loss, and the optimizer; the framework records the graph and applies the
+chain rule.
+
+A typical training loop has the following structure:
+\begin{enumerate}
+  \item initialize the network parameters;
+  \item choose a loss function and optimizer;
+  \item load a batch of examples;
+  \item run the forward pass and compute the loss;
+  \item run the backward pass to compute gradients;
+  \item update the parameters and repeat.
+\end{enumerate}
+\noindent
+This is the conceptual core behind PyTorch-style code: zero old gradients,
+evaluate the model, call backward on the loss, and let the optimizer step.
+
+Several practical issues remain outside the pure gradient formula. Poor
+initialization can make training slow or unstable. Too large a learning rate
+can overshoot; too small a learning rate can make progress painfully slow.
+Deep models may fit the training data while generalizing poorly. In the usual
+bias--variance language, underfitting corresponds to high bias, while
+overfitting corresponds to high variance. Regularization, more data, data
+augmentation, dropout, weight decay, batch normalization, and early stopping
+are common ways to improve generalization.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.0cm}p{5.2cm}p{5.0cm}@{}}
+    \toprule
+    Symptom & Meaning & Typical response \\
+    \midrule
+    High training error & The model or optimization setup is too weak &
+      increase capacity, train longer, adjust learning rate \\
+    Low training error but high validation error & The model overfits the
+      training set & use regularization, more data, or early stopping \\
+    Unstable loss & Updates are too aggressive or scales are poor &
+      lower learning rate, improve initialization, normalize inputs \\
+    \bottomrule
+  \end{tabular}
+  \caption{Most neural-network training failures can be diagnosed by comparing
+  training behavior with validation behavior.}
+\end{table}

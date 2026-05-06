@@ -1,6 +1,6 @@
 TEX := pdflatex
 MAIN := main
-TEX_SOURCES := $(MAIN).tex intro.tex
+TEX_SOURCES := $(MAIN).tex intro.tex neural_networks.tex
 FIGURES := $(wildcard figures/*)
 
 .PHONY: all clean distclean

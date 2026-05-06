@@ -24,6 +24,7 @@
 \newpage
 
 \input{intro}
+\input{neural_networks}
 
 \section{Core Topics}
 
@@ -56,20 +57,6 @@ A pinhole camera model is often the first geometric abstraction:
 It states that a 3D point $(X,Y,Z)$ is projected to image coordinates $(x,y)$
 through camera intrinsics $K$ and pose $(R,t)$, up to an unknown scale
 $\lambda$.
-
-\subsection{Learning-Based Methods}
-
-Add notes on neural networks, model training, evaluation, and uncertainty.
-
-For supervised recognition, the training set supplies pairs $(I_i,y_i)$ and the
-model parameters $\theta$ are chosen by minimizing an empirical loss:
-\begin{equation}
-  \hat{\theta} = \arg\min_\theta
-  \frac{1}{N}\sum_{i=1}^{N}\ell\!\left(g_\theta(I_i), y_i\right).
-\end{equation}
-\noindent
-This shifts part of the modeling burden from hand-designed rules to data,
-architecture, and evaluation.
 
 \subsection{Visual Object Models}
 
