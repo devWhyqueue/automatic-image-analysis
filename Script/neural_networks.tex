@@ -172,12 +172,17 @@ quantities. The backward pass starts from the derivative of the loss with
 respect to the output and propagates sensitivity information back through the
 same operations in reverse order.
 
-For a layer
+It is helpful to name the quantities at one layer before writing the gradient.
+Let $h_k$ be the activation vector that enters layer $k$. The trainable
+parameters of this layer are a weight matrix $\Omega_k$ and a bias vector
+$\beta_k$. The affine part of the layer first forms the pre-activation vector
 \begin{equation}
   f_k = \beta_k + \Omega_k h_k,
 \end{equation}
 \noindent
-the gradient with respect to a weight matrix has the structure
+and a nonlinearity would then produce the next activation, for example
+$h_{k+1}=\phi(f_k)$. With this notation, the gradient with respect to the weight
+matrix has the structure
 \begin{equation}
   \frac{\partial \ell_i}{\partial \Omega_k}
   =
