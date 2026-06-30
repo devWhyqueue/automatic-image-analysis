@@ -200,15 +200,6 @@ hypotheses, while top-down models select, refine, or reject them.
   interpretation.}
 \end{figure}
 
-\noindent
-One common low-level operation is convolution:
-\begin{equation}
-  (I * k)(x,y) = \sum_{u=-r}^{r}\sum_{v=-r}^{r} I(x-u,y-v)\,k(u,v).
-\end{equation}
-\noindent
-The same mathematical form can blur, sharpen, estimate derivatives, or detect
-local structure depending on the kernel $k$.
-
 Computer vision can be organized around three recurring goals: recognition,
 reconstruction, and reorganization.
 
@@ -340,6 +331,70 @@ a model, a task, and an application are not the same kind of object.
   connects image formation, intermediate representations, task goals, and prior
   knowledge.}
 \end{figure}
+
+\subsection{Data Types and Interpretation Tasks}
+
+Before listing concrete tasks, it helps to be precise about what kind of data an
+image is. We distinguish \emph{structured} from \emph{unstructured} data by
+whether the arrangement of the values carries meaning. A list of attributes such
+as $(70\,\mathrm{kg},\,170\,\mathrm{cm},\,32\,\mathrm{years})$ is unstructured:
+the entries can be permuted without changing what is described, as long as we
+remember which field is which. An image is structured, because the spatial
+layout of the pixels \emph{is} the information. Shuffling the pixels destroys the
+content even though the multiset of intensity values is unchanged; sound and text
+are structured for the same reason. This is exactly why image analysis cannot
+treat a picture as an unordered bag of intensities: position and neighborhood are
+part of the signal, and the methods in later sections are built to exploit them.
+
+High-level interpretation is not one task but a family of related questions, and
+it is worth naming them precisely because they differ in what the output looks
+like. \emph{Image classification} assigns the whole image, or a given region, to
+one of a fixed set of categories, without saying where anything is.
+\emph{Object detection} adds localization: it returns a set of objects, each with
+a position, usually a bounding box, together with a category, so it answers
+``what'' and ``where'' at once. \emph{Semantic segmentation} pushes localization
+to the pixel level, assigning a class label to every pixel and thereby
+partitioning the image into semantically uniform regions, though without
+separating individual instances of the same class. \emph{Object recognition} is
+the broader goal of identifying which objects are present; in its narrow sense it
+means recognizing a specific identity or instance, such as a particular face or
+landmark, and in its broad sense it is used as an umbrella over classification and
+detection. Beyond these, interpretation also includes pose estimation, which
+recovers the spatial configuration of an object, action recognition, which labels
+an activity in a video, and attribute classification, which describes properties
+rather than category.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.2cm}p{5.0cm}p{4.8cm}@{}}
+    \toprule
+    Task & Output & Question it answers \\
+    \midrule
+    Image classification & one category for the whole image or region &
+      what is in this image? \\
+    Object detection & set of located objects, e.g.\ boxes plus labels &
+      what is present and where? \\
+    Semantic segmentation & a class label for every pixel &
+      which class does each pixel belong to? \\
+    Object recognition & identity or category of the objects present &
+      what object is this? \\
+    Pose estimation & spatial configuration, e.g.\ keypoints or orientation &
+      how is the object arranged? \\
+    Action recognition & activity label for a clip &
+      what is happening over time? \\
+    \bottomrule
+  \end{tabular}
+  \caption{High-level interpretation tasks differ mainly in how much
+  localization they require, from a single image-level label up to a decision at
+  every pixel.}
+\end{table}
+
+\noindent
+These tasks share the same underlying processing chain. Image acquisition and
+preprocessing produce reliable low-level measurements, mid-level analysis groups
+them into features and segments, and the high-level stage turns those into the
+task-specific output above. The choice of task fixes the form of the answer, but
+the bottom-up evidence and top-down knowledge feeding into it are the same.
 
 \subsection{Models, Data, and Evaluation}
 

@@ -26,48 +26,4 @@
 \input{intro}
 \input{neural_networks}
 
-\section{Core Topics}
-
-The following sections collect the technical building blocks that will be
-expanded throughout the script. Each topic should connect back to the central
-question from the introduction: what can be inferred from image measurements,
-and what assumptions make that inference possible?
-
-\subsection{Image Formation and Representation}
-
-Add notes on image acquisition, sampling, color spaces, filtering, and basic
-image transformations.
-
-A pinhole camera model is often the first geometric abstraction:
-\begin{equation}
-  \lambda
-  \begin{bmatrix}
-    x \\ y \\ 1
-  \end{bmatrix}
-  =
-  K
-  \begin{bmatrix}
-    R & t
-  \end{bmatrix}
-  \begin{bmatrix}
-    X \\ Y \\ Z \\ 1
-  \end{bmatrix}.
-\end{equation}
-\noindent
-It states that a 3D point $(X,Y,Z)$ is projected to image coordinates $(x,y)$
-through camera intrinsics $K$ and pose $(R,t)$, up to an unknown scale
-$\lambda$.
-
-\subsection{Visual Object Models}
-
-Add notes on feature representations, object models, detection, and recognition.
-
-\subsection{Probabilistic Estimation}
-
-Add notes on Bayesian reasoning, probabilistic models, and parameter estimation.
-
-\section{Exercises}
-
-Use this section for worked exercise notes and derivations.
-
 \end{document}

@@ -98,8 +98,11 @@ decision boundaries from many simple units.
 \end{figure}
 
 \noindent
-Common activation functions include the logistic sigmoid, hyperbolic tangent,
-and rectified linear unit:
+Beyond being nonlinear, a useful transfer function is typically monotonic and
+smooth, so that it has a well-defined derivative everywhere; the classical
+logistic sigmoid and hyperbolic tangent are additionally bounded, which keeps
+activations in a fixed range. Common activation functions include the logistic
+sigmoid, hyperbolic tangent, and rectified linear unit:
 \begin{align}
   \sigma(z) &= \frac{1}{1 + e^{-z}},
   & \sigma'(z) &= \sigma(z)\left(1-\sigma(z)\right),\\
