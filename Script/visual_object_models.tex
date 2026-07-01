@@ -28,8 +28,7 @@ through increasingly flexible models: edges first vote for \emph{lines}
 Hough transform), and finally learned appearance \emph{parts} vote for the
 center of an \emph{object category} (implicit shape model). Saliency and
 descriptors sit in between, deciding \emph{which} local evidence is worth
-trusting in the first place. The diagrams referenced throughout are collected in
-Appendix~\ref{app:vom-figures} so that the derivations here stay uninterrupted.
+trusting in the first place.
 
 \subsection{Detecting Lines: The Hough Transform}
 
@@ -44,15 +43,73 @@ received many votes.
 
 To make ``the space of all lines'' concrete we need a way to label each line by a
 few numbers. The familiar slope--intercept form $y = mx + b$ is a poor choice: a
-vertical line has infinite slope, so $m$ and $b$ cannot represent it. A more even
-handed description uses the foot of the perpendicular dropped from the origin
-onto the line. Let $r$ be the length of that perpendicular (the shortest distance
-from the origin to the line) and $\theta$ the angle the perpendicular makes with
-the $x$-axis. Every point $(x,y)$ on the line then satisfies
+vertical line has infinite slope, so $m$ and $b$ cannot represent it. The
+\emph{Hesse normal form} sidesteps this by describing a line through the one point
+it can never help but single out --- the point on the line closest to the origin.
+
+Every line has a unique closest point to the origin: the foot of the perpendicular
+dropped from the origin onto the line. We can reach that foot by starting at the
+origin and walking a fixed distance $r \ge 0$ in a single direction. Call $\theta$
+the angle of that direction, so the unit vector pointing from the origin straight
+at the line is
 \begin{equation}
-  r = x\cos\theta + y\sin\theta .
+  \hat{\mathbf n} = (\cos\theta,\ \sin\theta),
+  \label{eq:unit-normal}
+\end{equation}
+\noindent
+so the foot of the perpendicular is the point
+\begin{equation}
+  P_0 = r\,\hat{\mathbf n} = (r\cos\theta,\ r\sin\theta).
+  \label{eq:foot}
+\end{equation}
+\noindent
+The vector from the origin to $P_0$ is $r$ times $\hat{\mathbf n}$, so it is
+\emph{normal} (perpendicular) to the line, because the shortest path from a point
+to a line always meets it at a right angle. The pair $(r,\theta)$ then pins the
+line down completely: $\theta$ says which way the line faces and $r$ says how far
+out it lies.
+
+To turn this picture into an equation, take any point $P = (x,y)$ on the line and
+look at the vector $P - P_0$ that runs from the foot to it. Because both $P$ and
+$P_0$ lie on the line, this vector points \emph{along} the line; and the line is
+perpendicular to the origin-to-foot vector $P_0$. Orthogonality of $P - P_0$ and
+$P_0$ means their dot product vanishes,
+\begin{equation}
+  (P - P_0)\cdot P_0 = 0
+  \qquad\Longleftrightarrow\qquad
+  P\cdot P_0 = P_0\cdot P_0 .
+  \label{eq:ortho}
+\end{equation}
+\noindent
+Both sides are now immediate. On the left,
+$P\cdot P_0 = x\,(r\cos\theta) + y\,(r\sin\theta) = r\,(x\cos\theta + y\sin\theta)$;
+on the right,
+$P_0\cdot P_0 = r^2(\cos^2\theta + \sin^2\theta) = r^2$, using
+$\cos^2\theta + \sin^2\theta = 1$. Equating the two gives
+$r\,(x\cos\theta + y\sin\theta) = r^2$, and cancelling one factor of $r$ (every
+line we care about has $r > 0$) leaves the Hesse normal form of the line,
+\begin{equation}
+  x\cos\theta + y\sin\theta = r .
   \label{eq:line-rtheta}
 \end{equation}
+\noindent
+Figure~\ref{fig:hesse} shows the whole construction. What looked like an arbitrary
+combination of a cosine and a sine is really one clean geometric statement: from
+every point $P$ on the line, the step $P - P_0$ to the foot leaves at a right angle
+to the origin-to-foot vector $P_0$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.52\textwidth]{figures/hesse_normal_form.pdf}
+  \caption{The Hesse normal form of a line. The foot of the perpendicular from the
+  origin $O$ is $P_0 = (r\cos\theta,\,r\sin\theta)$, reached by walking a distance
+  $r$ at angle $\theta$. For any point $P$ on the line $\ell$, the vector $P - P_0$
+  runs along the line and is therefore orthogonal to $P_0$; the condition
+  $(P-P_0)\cdot P_0 = 0$ is exactly $x\cos\theta + y\sin\theta = r$, which every
+  collinear edge point (orange) satisfies with the same $(r,\theta)$.}
+  \label{fig:hesse}
+\end{figure}
+
 \noindent
 Here $x$ and $y$ are pixel coordinates, $r \ge 0$ is measured in pixels, and
 $\theta$ ranges over $[0,\pi)$. A quick sanity check fixes the meaning of the two
@@ -68,22 +125,82 @@ every pixel that lies on one particular line produces the \emph{same} pair
 $(r,\theta)$, because $r$ and $\theta$ describe the line, not the individual
 point. A whole line in the image therefore collapses to a single point in the
 $(r,\theta)$ \emph{parameter space}. Now read the same equation the other way
-around. Fix a single image point $(x_0,y_0)$ and let $\theta$ vary; then
+around. Fix a single image point $(x_0,y_0)$ and let $\theta$ vary; the equation
+turns into a function of $\theta$ alone,
 \begin{equation}
-  r(\theta) = x_0\cos\theta + y_0\sin\theta
-            = R\,\sin(\theta + \varphi),
-  \qquad R = \sqrt{x_0^2 + y_0^2},
+  r(\theta) = x_0\cos\theta + y_0\sin\theta ,
+  \label{eq:point-r-of-theta}
+\end{equation}
+\noindent
+a fixed weighted sum of a cosine and a sine. Any such combination collapses to a
+single shifted sine of the same frequency, and it is worth seeing exactly why,
+because the shift is where the phase $\varphi$ comes from. Write down the shifted
+sine we are aiming for and expand it with the angle-addition identity
+$\sin(\alpha+\beta) = \sin\alpha\cos\beta + \cos\alpha\sin\beta$:
+\begin{equation}
+  R\,\sin(\theta + \varphi)
+    = \underbrace{R\cos\varphi}_{\text{weight of }\sin\theta}\,\sin\theta
+    + \underbrace{R\sin\varphi}_{\text{weight of }\cos\theta}\,\cos\theta .
+  \label{eq:phase-expand}
+\end{equation}
+\noindent
+For this to equal $x_0\cos\theta + y_0\sin\theta$ for \emph{every} $\theta$, the
+two expressions must have the same weight on $\cos\theta$ and the same weight on
+$\sin\theta$ separately. Matching them term by term gives
+\begin{equation}
+  x_0 = R\sin\varphi, \qquad y_0 = R\cos\varphi .
+  \label{eq:phase-match}
+\end{equation}
+\noindent
+These two relations determine $R$ and $\varphi$ from the point alone. Squaring and
+adding them cancels $\varphi$ (via $\sin^2+\cos^2 = 1$) and leaves the amplitude,
+\begin{equation}
+  R = \sqrt{x_0^2 + y_0^2},
+  \label{eq:phase-amp}
+\end{equation}
+\noindent
+which is simply the point's distance from the origin; dividing them instead cancels
+$R$ and fixes the phase,
+\begin{equation}
+  \varphi = \operatorname{atan2}(x_0,\, y_0).
+  \label{eq:phase-phi}
+\end{equation}
+\noindent
+Here $\operatorname{atan2}$ is the two-argument arctangent, which recovers the
+angle in the correct quadrant from the signed pair $(x_0,y_0)$. So $\varphi$ is not
+a new free parameter that appears from nowhere: it is the phase
+\emph{forced} on the sinusoid by where the point sits, namely the angle of
+$(x_0,y_0)$ measured from the $y$-axis (that is what
+Equation~\eqref{eq:phase-match} says, since $(x_0,y_0)=(R\sin\varphi,R\cos\varphi)$).
+Reassembling the pieces,
+\begin{equation}
+  r(\theta) = x_0\cos\theta + y_0\sin\theta = R\,\sin(\theta + \varphi),
   \label{eq:point-sinusoid}
 \end{equation}
 \noindent
 which is a sinusoid in the $(r,\theta)$ plane whose amplitude $R$ is just the
-point's distance from the origin. The sinusoid enumerates \emph{all} the lines
+point's distance from the origin and whose phase $\varphi$ encodes its direction.
+The sinusoid enumerates \emph{all} the lines
 that pass through that one point. Two pixels that happen to lie on a common line
 have sinusoids that cross at the $(r,\theta)$ of that shared line; many collinear
 pixels produce many sinusoids crossing at a single point. That crossing is the
 peak we are looking for. Figure~\ref{fig:hough-duality} shows both readings side
 by side: collinear points in the image (one point, one sinusoid) versus the
 single bright accumulator cell where the sinusoids meet.
+
+So far the ``points'' that vote have been abstract, but on a real image they are
+anything but. We do not start with a tidy list of points; we start with a grid of
+brightness values, and the first job is to decide which pixels are even worth a
+vote. That is what \emph{edge detection} does: it flags the pixels that sit on a
+strong local change in brightness --- the outlines where a dark region meets a
+light one --- and leaves the smooth interior, which carries no boundary
+information, silent. These high-contrast \emph{edge pixels} are the evidence the
+transform actually works with. A straight edge in the scene appears as a run of
+collinear edge pixels, and it is exactly their sinusoids that all pass through the
+one $(r,\theta)$ of that edge. A peak in parameter space is therefore not a
+geometric coincidence but a direct tally of how many real edge pixels line up: the
+more pixels that genuinely share a line, the taller the crossing they build, and
+the further it stands above the scatter left by unrelated pixels.
 
 This is also where the name \emph{Radon transform} comes from. We cannot solve
 for $(r,\theta)$ directly, because a single point lies on infinitely many lines.
@@ -95,14 +212,58 @@ $H_L(r,\theta)$. After all pixels have voted, a real line shows up as a
 pronounced maximum, while cells that received only scattered, accidental votes
 stay low. Detecting lines has become peak-finding in a 2D array.
 
+It helps to picture $H_L$ literally as an image and to set it next to the picture
+it came from, which is what Figure~\ref{fig:accumulator} does: the edge map on the
+left, the accumulator on the right. The horizontal axis is the angle $\theta$ and
+the vertical axis is the distance $r$ --- here allowed to take either sign, so that
+$\theta$ needs to run only over a half-turn instead of a full one. The plane is
+chopped into a grid of \emph{bins}, and the number of bins along each axis sets the
+resolution of the search: too coarse and neighbouring lines merge into one cell,
+too fine and the votes for a single line scatter across several. The grid starts
+completely black, at zero. Each edge pixel then paints its sinusoid of votes across
+it, brightening exactly one bin in every $\theta$ column, so on its own a pixel
+leaves only a faint curve. Where many collinear pixels overlap, their sinusoids
+pile into the \emph{same} bin, which flares into a concentrated bright hotspot,
+while the accidental votes of unrelated pixels stay dim and diffuse. Detecting lines
+is then nothing more than thresholding this image for its brightest cells and
+reading off their $(r,\theta)$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/hough_accumulator.pdf}
+  \caption{Image space and parameter space side by side, for a synthetic edge map of
+  $26$ collinear pixels (orange) plus $14$ scattered ones (grey). \emph{Left:} the
+  edge pixels, with the detected line and its perpendicular parameters $r$ and
+  $\theta$ measured from the origin $O$. \emph{Right:} the accumulator
+  $H_L(r,\theta)$ drawn as an image. Every edge pixel casts one vote per $\theta$
+  column, tracing a sinusoid across the grid; the collinear pixels' sinusoids all
+  cross in the same bin, which lights up as the bright peak (circled) at
+  $(\theta,r)\approx(60^\circ,25\,\text{px})$, whereas the noise pixels leave only
+  faint, uncrossed curves. That peak \emph{is} the line on the left: line detection
+  reduces to thresholding this grid for its hottest cells and reading off their
+  $(r,\theta)$. Brightness is the number of votes a bin has received.}
+  \label{fig:accumulator}
+\end{figure}
+
 \paragraph{Using gradients.}
-Sweeping over every direction $\theta$ at every pixel is wasteful, and it throws
-away information we already have. Edge detection does not merely tell us
-\emph{where} an edge is; it also tells us its \emph{orientation}, because an edge
-runs perpendicular to the local image gradient. Write the gradient of the image
-brightness as the pair $\bigl(G_x(x,y),\,G_y(x,y)\bigr)$, the rates of change in
-the $x$ and $y$ directions (for example the outputs of a Sobel filter). The
-gradient direction
+Making every edge pixel sweep over all directions $\theta$ is wasteful, because it
+throws away information the edge detector already handed us for free. Finding an
+edge means measuring, at each pixel, the direction in which the brightness changes
+fastest: the direction of \emph{steepest contrast}, pointing straight across the
+boundary from the dark side to the light side. That direction is the image
+\emph{gradient}. Now the geometric twist that makes it so useful --- and it is easy
+to get backwards. The brightness changes fastest as you step \emph{across} an edge
+and barely at all as you walk \emph{along} it, so the gradient points
+\emph{perpendicular} to the edge, not along it. The direction of maximum contrast
+tells us which way the boundary faces; the edge itself runs at a right angle to
+that. But ``perpendicular to the edge'' is precisely the \emph{normal} direction of
+the line through the pixel --- the same normal $\hat{\mathbf n}$ whose angle we
+named $\theta$ in the Hesse form. The contrast direction therefore hands us
+$\theta$ directly, and with it the single line that can pass through that pixel, so
+the pixel casts one sharp, well-aimed vote instead of a whole sinusoid of guesses.
+To make this concrete, write the gradient of the image brightness as the pair
+$\bigl(G_x(x,y),\,G_y(x,y)\bigr)$, the rates of change in the $x$ and $y$
+directions (for example the outputs of a Sobel filter). The gradient direction
 \begin{equation}
   \theta_G(x,y) = \operatorname{atan2}\!\big(G_y(x,y),\,G_x(x,y)\big)
   \label{eq:gradient-angle}
