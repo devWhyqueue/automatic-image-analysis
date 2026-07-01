@@ -301,17 +301,44 @@ piece of local evidence is, the cleaner the peaks and the fewer the false alarms
 
 Lines are special because they have a tidy two-parameter equation. Most objects
 do not: a wrench, a leaf, or a logo is an arbitrary 2D curve with no closed-form
-parameterization. The \emph{generalized Hough transform} (GHT) keeps the voting
-idea but replaces the parametric equation with a stored table that records the
+parameterization. Since we cannot write such a shape down as a formula, we instead
+\emph{show} it to the algorithm: we supply a \emph{template} --- a single example,
+one image of the object or equivalently the 2D curve of its boundary --- that
+serves as the known geometric model of exactly the shape we want to find. The
+\emph{generalized Hough transform} (GHT) keeps the voting idea but, in place of a
+parametric equation, compiles this template into a stored table that records the
 shape's geometry explicitly. The detector still asks the same question every edge
 can answer with a vote, only now about a shape rather than a line: \emph{if you
 are part of this shape, where is its center?}
 
-To set this up we first pick one \emph{reference point} on the model shape,
+Everything then splits into two phases built around that template, laid out in
+Figure~\ref{fig:ght-template}. \emph{Training} reads the template once and turns it
+into the table; \emph{detection} runs the votes on each new test image. We take the
+two in turn.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/ght_template.pdf}
+  \caption{The generalized Hough transform, from template to detection.
+  \emph{(1)~Template:} on the known model shape we fix a reference point (the
+  center, magenta star); at each edge we read its gradient direction (solid arrows)
+  and record the displacement vector pointing to the center (dashed arrows).
+  \emph{(2)~R-table:} those displacements are filed by gradient orientation, so a
+  gradient direction indexes straight to the vectors seen at edges facing that way;
+  because one orientation can occur at several places on the shape, a single bin may
+  hold more than one vector. \emph{(3)~Test image:} each observed edge looks up its
+  gradient in the R-table and votes for a center at its position plus the stored
+  displacement; edges of a genuine instance all point to the same spot, which wins
+  the accumulator peak. Colours track the same edge through all three panels.}
+  \label{fig:ght-template}
+\end{figure}
+
+\noindent
+To set this up we first pick one \emph{reference point} on the template,
 typically (but not necessarily) its center of mass. This reference point plays
 the role that $(r,\theta)$ played for lines: its position in a test image is what
-we are voting for. During training we walk along the model contour, and for each
-edge pixel at position $(x,y)$ we record the \emph{displacement vector}
+we are voting for. During training we walk along the template's contour, and for
+each edge pixel at position $(x,y)$ we record the \emph{displacement vector}
 $(d_x,d_y)$ that points from that edge to the reference point, so that
 \begin{equation}
   (x_\text{ref},\,y_\text{ref}) = (x + d_x,\; y + d_y).
@@ -533,7 +560,8 @@ the pixels are collected into a histogram (for example over nine orientation
 bins), each pixel contributing in proportion to its gradient magnitude. Cells are
 then grouped into overlapping \emph{blocks}, and the histograms in a block are
 normalized together before being concatenated, over all blocks, into one long
-feature vector. Two design choices give HOG its character. Summarizing gradient
+feature vector. Figure~\ref{fig:hog} shows the whole construction on a simple
+shape. Two design choices give HOG its character. Summarizing gradient
 \emph{orientations} rather than raw intensities, together with the block
 normalization, makes it robust to moderate lighting changes and small
 deformations. But because the descriptor is laid out as a fixed grid of oriented
@@ -541,6 +569,22 @@ histograms, rotating the patch permutes the bins and changes the vector: standar
 HOG is \emph{not} rotation invariant. In return it turns the diffuse evidence of
 many edges into a single classifier-ready vector, which is why it remains a
 standard baseline against which learned features are measured.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/hog_descriptor.pdf}
+  \caption{Building a HOG descriptor, computed on a synthetic disk.
+  \emph{Left:} the region is divided into a grid of cells (one highlighted in
+  magenta). \emph{Middle:} each cell is replaced by a small star of strokes, one
+  per orientation bin, whose length is the total gradient magnitude falling in that
+  orientation; since gradients run perpendicular to edges, the strokes point
+  radially around the disk's rim, while flat interior and exterior cells stay
+  empty. \emph{Right:} the highlighted cell's nine-bin histogram of gradient
+  orientation, each pixel weighted by its gradient magnitude, with a clear peak at
+  the orientation of the local edge. Stacking every cell's (block-normalized)
+  histogram into one vector yields the descriptor.}
+  \label{fig:hog}
+\end{figure}
 
 Two further descriptor families round out the classical toolkit and contrast
 usefully with HOG. \emph{Fourier descriptors} encode a closed contour by the
