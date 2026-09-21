@@ -8,15 +8,20 @@
 \usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
-% placeins is not installed: flush pending floats before each \section
+% placeins is not installed: flush pending floats before each \section and \subsection
 \usepackage{etoolbox}
 \makeatletter
 \newcommand\FloatBarrier{\ifx\@toplist\@empty\ifx\@botlist\@empty\ifx\@deferlist\@empty\else\clearpage\fi\fi\else\clearpage\fi}
 \pretocmd{\section}{\FloatBarrier}{}{}
+\pretocmd{\subsection}{\FloatBarrier}{}{}
 \makeatother
 \usepackage{tikz}
 \usepackage[hidelinks]{hyperref}
 \usepackage[margin=2.5cm]{geometry}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.6}
 \usetikzlibrary{arrows.meta,calc,positioning,shapes.geometric}
 
 \title{Automatic Image Analysis Script}
@@ -34,7 +39,6 @@
 \input{visual_object_models}
 
 \appendix
-\input{appendix_figures}
 \input{appendix_supplements}
 
 \end{document}

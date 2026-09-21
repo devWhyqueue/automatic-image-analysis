@@ -188,6 +188,16 @@ peak we are looking for. Figure~\ref{fig:hough-duality} shows both readings side
 by side: collinear points in the image (one point, one sinusoid) versus the
 single bright accumulator cell where the sinusoids meet.
 
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.66\textwidth]{figures/hough_duality_portrait.png}
+  \caption{Hough duality for line detection. Collinear edge points in image
+  space (top) all map to the same point in the $(r,\theta)$ accumulator
+  (bottom); each individual point maps to a sinusoid, and the sinusoids intersect
+  where the pixels agree. The pronounced peak triggers the detection.}
+  \label{fig:hough-duality}
+\end{figure}
+
 So far the ``points'' that vote have been abstract, but on a real image they are
 anything but. We do not start with a tidy list of points; we start with a grid of
 brightness values, and the first job is to decide which pixels are even worth a
@@ -449,6 +459,17 @@ uncertain about where the center is, but only the true center collects support
 from many edges at once. Figure~\ref{fig:ght-rtable} traces this from the model
 contour and its displacement vectors through the R-table to the accumulator peak.
 
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.66\textwidth]{figures/ght_rtable_portrait.png}
+  \caption{Generalized Hough transform. Each model edge stores a displacement
+  vector to the reference point, organized in the R-table by gradient
+  orientation. Because the same orientation occurs at several places on the
+  shape, one observed edge casts votes for several candidate centers; the true
+  center is where votes accumulate.}
+  \label{fig:ght-rtable}
+\end{figure}
+
 Real instances also differ from the stored template in size and orientation. To
 handle this, the accumulator gains two more axes and becomes four-dimensional,
 $H(x,y,s,\theta)$, where $(x,y)$ is the candidate center, $s$ a scale factor, and
@@ -651,6 +672,17 @@ complex (high $H_D$) and tied to a distinctive scale (high $W_D$). This is exact
 what suppresses featureless noise, whose entropy is high but flat across scale.
 Figure~\ref{fig:saliency-scale} shows the entropy-versus-scale curve with its
 peak, alongside the flat-versus-peaked histogram intuition.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.66\textwidth]{figures/saliency_scale_portrait.png}
+  \caption{Scale-space saliency. The same location is analyzed over a range of
+  window sizes; entropy as a function of scale has a peak at the salient scale.
+  A flat local histogram (high entropy) signals a rare, informative region,
+  while the scale-localization weight discounts patches whose statistics barely
+  change across scale.}
+  \label{fig:saliency-scale}
+\end{figure}
 
 The two multi-scale representations mentioned above are not the same thing. An
 \emph{image pyramid} subsamples the image in logarithmic steps of resolution,
@@ -862,6 +894,17 @@ both localizes the object within a surrounding region and, through a probabilist
 formulation, yields a pixel-level \emph{segmentation} rather than a mere bounding
 box. Figure~\ref{fig:ism-pipeline} lays out the whole pipeline, training above and
 prediction below.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/ism_pipeline.png}
+  \caption{The implicit shape model. Training (top row): salient patches are
+  described, clustered into a codebook, and annotated with offset vectors to the
+  object center. Prediction (bottom row): test patches are matched to the
+  codebook, cast generalized Hough votes for the center, and the peak is
+  back-projected to recover and segment the object.}
+  \label{fig:ism-pipeline}
+\end{figure}
 
 Because ISM grows directly out of the generalized Hough transform, it helps to see
 the two side by side; Table~\ref{tab:ght-vs-ism} lines up what changes and what
