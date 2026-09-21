@@ -11,8 +11,8 @@ from examples.
 Szeliski's treatment of deep learning, especially the part on deep neural
 networks and backpropagation, is a useful companion for this topic. The focus
 here is narrower: understand the computational structure of a feed-forward
-network and why backpropagation is the efficient way to compute the gradients
-needed for training.
+network, why backpropagation is the efficient way to compute the gradients
+needed for training, and how to tell whether a trained network will generalize.
 
 \subsection{From Perceptrons to Multilayer Networks}
 
@@ -41,6 +41,17 @@ where $\eta$ is the learning rate. The rule is useful historically because it
 already shows the pattern of learning from prediction error, but modern neural
 networks need a smoother and more general gradient-based view.
 
+Logistic regression is the smooth relative of the perceptron and a useful
+reference point. For $C$ classes and a $D$-dimensional input it computes one
+affine score per class, $z = Wx + b$ with $W \in \mathbb{R}^{C\times D}$ and
+$b\in\mathbb{R}^C$, and turns the scores into probabilities with the softmax
+function (introduced below). Its parameter count, $C(D+1)$, therefore depends on
+both the number of classes and the input dimensionality (for two classes one
+score suffices, giving $D+1$). Despite the nonlinear softmax, the predicted class
+is the largest affine score, and the boundary between two classes, where
+$z_i = z_j$, is a hyperplane: logistic regression is a \emph{linear} classifier,
+exactly like linear regression used for classification.
+
 A multilayer perceptron (MLP) overcomes the purely linear limitation by stacking
 several affine maps and nonlinear activation functions. For layer $l$,
 \begin{equation}
@@ -51,7 +62,10 @@ several affine maps and nonlinear activation functions. For layer $l$,
 \noindent
 Without the nonlinearity $\phi$, stacking layers would still collapse into one
 linear transformation. The nonlinearities make it possible to build complex
-decision boundaries from many simple units.
+decision boundaries from many simple units. The entries of $W^l$ are the
+\emph{weights}, one per connection, and $b^l$ is the \emph{bias}. Network
+diagrams often draw the bias as an extra neuron with constant output $1$ whose
+outgoing weights are the bias values; both views compute the same affine map.
 
 \begin{figure}[ht]
   \centering
@@ -114,7 +128,45 @@ sigmoid, hyperbolic tangent, and rectified linear unit:
 For ReLU, the derivative is $1$ for positive inputs and $0$ for negative
 inputs; at zero one chooses a convenient subgradient in implementations. This
 simple derivative is one reason ReLU-style activations are computationally
-attractive.
+attractive, and ReLU is the standard choice in convolutional networks.
+
+\paragraph{Worked forward pass.}
+Computing a small network by hand is the best check that the notation is
+understood. Take two inputs, one hidden layer with two ReLU units, and two ReLU
+output units, with the weights of Table~\ref{tab:mlp-example}. The input is
+$x = (2,1)$ and the target is $y = (0,1)$.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    Unit & weight from 1st input & weight from 2nd input & bias \\
+    \midrule
+    hidden $h_1$ & $1$ & $-1$ & $0$ \\
+    hidden $h_2$ & $-1$ & $1$ & $0.5$ \\
+    output $o_1$ (inputs $h_1,h_2$) & $1$ & $1$ & $-1$ \\
+    output $o_2$ (inputs $h_1,h_2$) & $2$ & $-1$ & $0$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Weights of a 2--2--2 ReLU network. Each row lists the weights of the
+  connections entering one unit; the bias is the weight from the constant-$1$
+  neuron.}
+  \label{tab:mlp-example}
+\end{table}
+
+\noindent
+Layer by layer, first form the weighted sum and then apply ReLU:
+\begin{align*}
+  h_1 &= \max(0,\ 1\cdot 2 - 1\cdot 1 + 0) = 1, &
+  h_2 &= \max(0,\ -1\cdot 2 + 1\cdot 1 + 0.5) = \max(0,-0.5) = 0,\\
+  o_1 &= \max(0,\ 1\cdot 1 + 1\cdot 0 - 1) = 0, &
+  o_2 &= \max(0,\ 2\cdot 1 - 1\cdot 0 + 0) = 2 .
+\end{align*}
+\noindent
+With the squared-error criterion $e = \tfrac12\lVert o - y\rVert_2^2$ the error
+is $e = \tfrac12\bigl((0-0)^2 + (2-1)^2\bigr) = \tfrac12$. Two details are easy
+to get wrong under time pressure: ReLU clips negative sums to zero \emph{before}
+they enter the next layer, and the factor $\tfrac12$ belongs to the whole sum.
 
 \subsection{Losses, Optimization, and the Need for Gradients}
 
@@ -126,27 +178,59 @@ how bad a prediction is. Over a dataset, the empirical objective is
   \sum_{i=1}^{N} \ell\!\left(f_\theta(x_i), y_i\right).
 \end{equation}
 \noindent
-For regression, $\ell$ may be a squared error. For classification, it is often
-cross-entropy applied to class scores or probabilities. The exact loss depends
-on the task, but the training problem has the same form: find parameters that
-make the loss small.
-
-Stochastic gradient descent updates parameters using a small batch
-$\mathcal{B}_t$ instead of the full dataset:
+For regression, $\ell$ is typically the squared error
+$\tfrac12\lVert f_\theta(x) - y\rVert^2$. For classification, the network
+outputs one score (logit) $z_c$ per class, the softmax turns the scores into
+probabilities, and the loss is the cross-entropy, the negative log-probability
+of the correct class $y$:
 \begin{equation}
-  \theta_{t+1}
-  =
-  \theta_t
-  -
-  \alpha
-  \sum_{i\in\mathcal{B}_t}
-  \frac{\partial \ell_i(\theta_t)}{\partial \theta},
+  p_c = \frac{e^{z_c}}{\sum_{j=1}^{C} e^{z_j}},
+  \qquad
+  \ell_{\mathrm{CE}} = -\log p_y .
 \end{equation}
 \noindent
-where $\alpha$ is the learning rate. The practical difficulty is not writing
-this update down; it is computing the partial derivatives for millions of
-parameters quickly and without duplicating work. Backpropagation solves exactly
-that problem.
+The loss is what the optimizer sees, so it must match the task; accuracy itself
+is not differentiable and is only used to evaluate the result.
+
+Even when the loss is convex, as for logistic regression, there is in general no
+closed-form solution for the best parameters, so the minimum has to be found
+iteratively. Gradient descent is therefore not a tool reserved for non-convex
+problems; convexity only guarantees that it will not get stuck in a worse local
+minimum. For deep networks the loss is non-convex, and (stochastic) gradient
+descent gives no guarantee of reaching the optimal solution.
+
+Gradient descent steps against the gradient with learning rate $\eta$. The
+three classical variants differ only in how many examples enter one update:
+\begin{align}
+  \text{online:}\quad
+    &\Delta w = -\eta\, \frac{\partial e_n}{\partial w}
+      &&\text{after every single example } n,\\
+  \text{mini-batch:}\quad
+    &\Delta w = -\eta \sum_{n\in\mathcal{B}_t} \frac{\partial e_n}{\partial w}
+      &&\text{after a small batch } \mathcal{B}_t,\\
+  \text{offline (batch):}\quad
+    &\Delta w = -\eta \sum_{n=1}^{N} \frac{\partial e_n}{\partial w}
+      &&\text{after a pass over all } N \text{ examples}.
+\end{align}
+\noindent
+Offline learning follows the exact gradient of the full objective but updates
+rarely; online learning updates often but with a noisy direction. Stochastic
+gradient descent in modern practice is the mini-batch variant. Two common
+additions modify the update. \emph{Momentum} (inertia) keeps part of the previous
+step, so that consistent directions accelerate and oscillations cancel,
+\begin{equation}
+  \Delta w(t+1) = -\eta\, \frac{\partial e}{\partial w} + \alpha\, \Delta w(t),
+  \qquad 0 \le \alpha < 1 ;
+\end{equation}
+\noindent
+\emph{weight decay} adds a penalty $\tfrac{\lambda}{2}\lVert w\rVert^2$ to the
+loss, which contributes $-\eta\lambda w$ to every step and pulls unused weights
+toward zero.
+
+Whatever the variant, every step needs the partial derivatives of the loss with
+respect to all parameters. The practical difficulty is not writing the update
+down; it is computing these derivatives for millions of parameters quickly and
+without duplicating work. Backpropagation solves exactly that problem.
 
 \begin{table}[ht]
   \centering
@@ -176,6 +260,76 @@ quantities. The backward pass starts from the derivative of the loss with
 respect to the output and propagates sensitivity information back through the
 same operations in reverse order.
 
+\paragraph{A graph worked by hand.}
+The mechanism is clearest on a tiny scalar graph, $f = (x+y)\cdot z$ with
+$x=-2$, $y=5$, $z=-4$ (Figure~\ref{fig:backprop-graph}). The forward pass
+computes and stores the intermediate value $q = x + y = 3$ and the output
+$f = qz = -12$. The backward pass starts with $\partial f/\partial f = 1$ and
+applies one local rule per node. The multiplication node sends to each input the
+upstream gradient times the \emph{other} input:
+$\partial f/\partial z = q = 3$ and $\partial f/\partial q = z = -4$. The
+addition node has local derivative $1$ for both inputs, so it passes the
+upstream gradient unchanged to each of them:
+$\partial f/\partial x = \partial f/\partial y = -4$.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      node distance=1.9cm,
+      var/.style={draw, circle, minimum size=0.75cm, inner sep=0pt},
+      op/.style={draw, rounded corners, fill=blue!8, minimum size=0.75cm},
+      arrow/.style={-{Latex[length=2.4mm]}, thick}
+    ]
+    \node[var] (x) {$x$};
+    \node[var, below=0.9cm of x] (y) {$y$};
+    \node[op, right=of $(x)!0.5!(y)$] (add) {$+$};
+    \node[var, below=0.9cm of y] (z) {$z$};
+    \node[op, right=of add, yshift=-0.9cm] (mul) {$\times$};
+    \node[var, right=1.6cm of mul] (f) {$f$};
+    \draw[arrow] (x) -- (add);
+    \draw[arrow] (y) -- (add);
+    \draw[arrow] (add) -- (mul);
+    \draw[arrow] (z) -- (mul);
+    \draw[arrow] (mul) -- (f);
+    \node[left=0.1cm of x, font=\small] {$-2$ \textcolor{red!70!black}{$(-4)$}};
+    \node[left=0.1cm of y, font=\small] {$5$ \textcolor{red!70!black}{$(-4)$}};
+    \node[left=0.1cm of z, font=\small] {$-4$ \textcolor{red!70!black}{$(3)$}};
+    \node[above=0.3cm of $(add)!0.5!(mul)$, font=\small]
+      {$q=3$ \textcolor{red!70!black}{$(-4)$}};
+    \node[right=0.1cm of f, font=\small] {$-12$ \textcolor{red!70!black}{$(1)$}};
+  \end{tikzpicture}
+  \caption{Backpropagation on $f=(x+y)z$. Black numbers are forward values,
+  red numbers in parentheses are the gradients $\partial f/\partial(\cdot)$ from
+  the backward pass. The multiplication node swaps its inputs; the addition node copies the
+  upstream gradient to both inputs.}
+  \label{fig:backprop-graph}
+\end{figure}
+
+\noindent
+These local rules are worth remembering as patterns, summarized in
+Table~\ref{tab:gate-rules}. In particular, an addition node does \emph{not} send
+its inputs backward; it distributes the upstream gradient.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.4cm}p{3.6cm}p{7.2cm}@{}}
+    \toprule
+    Node & Local derivative & Backward behavior \\
+    \midrule
+    Addition $a+b$ & $1$ for each input & distributes: each input receives the
+      upstream gradient unchanged \\
+    Multiplication $ab$ & $b$ for $a$, $a$ for $b$ & swaps: each input receives
+      the upstream gradient times the other input's forward value \\
+    Maximum $\max(a,b)$ & $1$ for the larger, $0$ else & routes: only the larger
+      input receives the gradient (ReLU is $\max(0,z)$) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Backward rules of the elementary nodes. The multiplication rule is
+  why forward values must be stored until the backward pass.}
+  \label{tab:gate-rules}
+\end{table}
+
+\paragraph{The layer view.}
 It is helpful to name the quantities at one layer before writing the gradient.
 Let $h_k$ be the activation vector that enters layer $k$. The trainable
 parameters of this layer are a weight matrix $\Omega_k$ and a bias vector
@@ -193,10 +347,10 @@ matrix has the structure
   \frac{\partial \ell_i}{\partial f_k}\,h_k^\top .
 \end{equation}
 \noindent
-This formula captures a useful intuition from the lecture: the effect of a
-weight depends both on the upstream error signal and on the activation feeding
-into that weight. If the previous activation is doubled, the same small weight
-change has twice the local effect.
+This is the multiplication rule at matrix scale: the effect of a weight depends
+both on the upstream error signal and on the activation feeding into that
+weight. If the previous activation is doubled, the same small weight change has
+twice the local effect.
 
 \begin{figure}[ht]
   \centering
@@ -245,19 +399,29 @@ of the activation:
 where $\odot$ denotes elementwise multiplication. The indicator gates the
 gradient: inactive ReLU units do not pass local gradient information backward.
 
+\paragraph{What backpropagation costs and what it does not do.}
 The important point is not to memorize every indexed expression, but to know
-what must be stored and what is reused. The activations from the forward pass
-are needed during the backward pass. This makes backpropagation efficient, but
-also memory-hungry for large networks.
+what must be stored and what is reused. One parameter update needs exactly
+\emph{one} forward pass (to compute and store all intermediate values) and
+\emph{one} backward pass (to reuse them); every derivative is computed once and
+shared by all parameters upstream of it. Because the forward values of every
+node are kept until the backward pass, the memory consumption grows with the
+combined output dimensionality of all nodes in the graph (the stored
+activations, times the batch size), not merely with the number of trainable
+parameters. Backpropagation is only a way to \emph{compute} the gradient
+exactly and efficiently. It does not change which gradient is computed, so it
+neither reduces the noise of stochastic gradient descent (that comes from using
+mini-batches) nor guarantees that the optimizer reaches the optimal solution.
 
 \subsection{Automatic Differentiation and Practical Training}
 
 Modern deep-learning libraries implement backpropagation through automatic
 differentiation. A model is represented as an acyclic graph of operations. Each
 operation knows how to compute its output in the forward direction and how to
-propagate derivatives in the reverse direction. The user specifies the model,
-the loss, and the optimizer; the framework records the graph and applies the
-chain rule.
+propagate derivatives in the reverse direction, exactly as the nodes of
+Table~\ref{tab:gate-rules}. The user specifies the model, the loss, and the
+optimizer; the framework records the graph and applies the chain rule. Branches
+are allowed as long as the graph stays acyclic.
 
 A typical training loop has the following structure:
 \begin{enumerate}
@@ -271,15 +435,94 @@ A typical training loop has the following structure:
 \noindent
 This is the conceptual core behind PyTorch-style code: zero old gradients,
 evaluate the model, call backward on the loss, and let the optimizer step.
+Poor initialization can make training slow or unstable. Too large a learning
+rate can overshoot; too small a learning rate can make progress painfully slow.
 
-Several practical issues remain outside the pure gradient formula. Poor
-initialization can make training slow or unstable. Too large a learning rate
-can overshoot; too small a learning rate can make progress painfully slow.
-Deep models may fit the training data while generalizing poorly. In the usual
-bias--variance language, underfitting corresponds to high bias, while
-overfitting corresponds to high variance. Regularization, more data, data
-augmentation, dropout, weight decay, batch normalization, and early stopping
-are common ways to improve generalization.
+\subsection{Generalization: Overfitting, Bias, Variance, and Regularization}
+
+A network that fits its training data perfectly may still be useless. The goal
+is low error on \emph{new} data, and the training error cannot measure that:
+a flexible model can memorize the training set, noise included, which is called
+\emph{overfitting}. The opposite failure, \emph{underfitting}, occurs when the
+model is not complex enough to match the data and performs poorly even on the
+training set. Figure~\ref{fig:overfit} shows the typical picture: as model
+complexity grows, the training error keeps falling, while the error on held-out
+data first falls and then rises again once the model starts fitting noise.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[x=1cm, y=1cm]
+    \draw[-{Latex[length=2.4mm]}, thick] (0,0) -- (7.2,0)
+      node[right, font=\small, align=left] {model\\complexity};
+    \draw[-{Latex[length=2.4mm]}, thick] (0,0) -- (0,3.6)
+      node[above, font=\small] {error};
+    \draw[very thick, blue!70!black] (0.3,3.2) .. controls (2,0.9) and (4,0.4)
+      .. (7,0.25);
+    \draw[very thick, red!70!black] (0.3,3.3) .. controls (2,0.9) and (3.2,0.7)
+      .. (4,1.0) .. controls (5,1.5) and (6,2.3) .. (7,2.9);
+    \node[font=\small, text=blue!70!black, anchor=west] at (5.3,0.6)
+      {training};
+    \node[font=\small, text=red!70!black, anchor=west] at (5.9,3.1)
+      {validation};
+    \draw[dashed, gray] (3.05,0) -- (3.05,3.0);
+    \node[font=\small, align=center] at (1.4,-0.45) {underfitting\\high bias};
+    \node[font=\small, align=center] at (5.3,-0.45) {overfitting\\high variance};
+  \end{tikzpicture}
+  \vspace{0.3cm}
+  \caption{Training and validation error versus model complexity. The dashed
+  line marks the complexity with the lowest validation error; to its left the
+  model underfits, to its right it overfits.}
+  \label{fig:overfit}
+\end{figure}
+
+\noindent
+The \emph{bias--variance} vocabulary names the two failures. A model with high
+\emph{bias} does not match the training data closely; it underfits.
+\emph{Variance} describes how much the fitted model changes when it is trained on
+different portions of the data. It can be measured exactly that way: fit the
+model to several subsets and compare the results. A high-variance model follows
+the particular sample it saw and therefore overfits.
+
+\paragraph{Training, validation, and test data.}
+Because the training error is optimistically biased, the available data are
+split into three parts with different roles. The \emph{training set} fits the
+parameters. The \emph{validation set} is used for every decision about the
+model: hyperparameters such as learning rate, weight decay, or depth, and when
+to stop training. The degree of overfitting is read from the gap between
+training and validation error, never from the training data alone. The
+\emph{test set} is touched once, at the end, for an unbiased estimate; once it
+influences a decision, it is no longer a test set. This separation is needed for
+every model, convex or not, because convexity concerns only how well the
+optimizer finds the minimum of the training loss, not how well that minimum
+generalizes. It also fixes the reading of small errors: a small training error
+only suggests that the model has sufficient complexity, while a small
+\emph{validation} error suggests good performance.
+
+\paragraph{Regularization.}
+Regularization is any change that reduces overfitting by encoding a preference
+for simpler or more robust solutions. The standard tools are:
+\begin{itemize}
+  \item \emph{Weight decay} ($L_2$ penalty): add $\lambda\lVert W\rVert_2^2$ to the
+        loss so that large weights are discouraged.
+  \item \emph{Dropout}: randomly set a fraction of activations to zero during
+        training so that the network cannot rely on any single path; at test
+        time all units are used.
+  \item \emph{Data augmentation}: enlarge the training set with transformed
+        copies (crops, flips, small rotations, color jitter). This has a
+        regularizing effect, because the model must produce the same answer for
+        all variants; the transformations must respect the semantics of the
+        task.
+  \item \emph{Early stopping}: monitor the validation loss after every epoch,
+        stop when it has not improved for a fixed number $p$ of epochs
+        (patience), and keep the checkpoint with the best validation loss, not
+        the last one.
+  \item \emph{Batch normalization}: normalize activations over the mini-batch and
+        learn a scale and shift; mainly a stabilizer of optimization with a mild
+        regularizing side effect.
+\end{itemize}
+\noindent
+More data and a smaller model act in the same direction. Table~\ref{tab:diagnosis}
+turns these ideas into a diagnosis checklist.
 
 \begin{table}[ht]
   \centering
@@ -287,14 +530,16 @@ are common ways to improve generalization.
     \toprule
     Symptom & Meaning & Typical response \\
     \midrule
-    High training error & The model or optimization setup is too weak &
-      increase capacity, train longer, adjust learning rate \\
+    High training error & The model or optimization setup is too weak (high
+      bias) & increase capacity, train longer, adjust learning rate \\
     Low training error but high validation error & The model overfits the
-      training set & use regularization, more data, or early stopping \\
+      training set (high variance) & use regularization, more data, or early
+      stopping \\
     Unstable loss & Updates are too aggressive or scales are poor &
       lower learning rate, improve initialization, normalize inputs \\
     \bottomrule
   \end{tabular}
   \caption{Most neural-network training failures can be diagnosed by comparing
   training behavior with validation behavior.}
+  \label{tab:diagnosis}
 \end{table}

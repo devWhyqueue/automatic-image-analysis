@@ -1,0 +1,282 @@
+\section{Edge Detection Essentials}
+\label{app:edges}
+
+Every voting method in Section~\ref{sec:visual-object-models} starts from edge
+pixels and their gradients. The intuition is simple: an edge is where the
+brightness changes abruptly, so its location is where the first derivative of
+the image is large. This appendix collects what is needed to compute gradients
+and to understand the reference edge detector, Canny.
+
+\paragraph{Gradients from derivative filters.}
+On a pixel grid the derivatives $G_x = \partial I/\partial x$ and
+$G_y = \partial I/\partial y$ are approximated by small convolution kernels. The
+Sobel kernels combine a central difference in one direction with a smoothing
+in the other:
+\begin{equation}
+  S_x = \begin{pmatrix} -1 & 0 & 1\\ -2 & 0 & 2\\ -1 & 0 & 1 \end{pmatrix},
+  \qquad
+  S_y = S_x^\top = \begin{pmatrix} -1 & -2 & -1\\ 0 & 0 & 0\\ 1 & 2 & 1
+  \end{pmatrix}.
+\end{equation}
+\noindent
+The Prewitt kernels are the same with the weights $2$ replaced by $1$. From the
+two responses follow the gradient magnitude
+$\lVert\nabla I\rVert = \sqrt{G_x^2 + G_y^2}$ (edge strength) and the orientation
+$\theta = \operatorname{atan2}(G_y,G_x)$. The gradient points from dark to
+bright and is perpendicular to the edge; the edge itself runs along
+$\theta \pm 90^\circ$.
+
+\paragraph{The Canny detector.}
+Thresholding the gradient magnitude alone gives thick, broken, noisy edges.
+Canny fixes this in four steps:
+\begin{enumerate}
+  \item smooth the image with a Gaussian to suppress noise;
+  \item compute gradient magnitude and orientation, e.g.\ with Sobel kernels;
+  \item \emph{non-maximum suppression}: keep a pixel only if its magnitude is a
+        local maximum along the gradient direction, which thins every edge to a
+        one-pixel-wide line;
+  \item \emph{hysteresis thresholding} with a high and a low threshold: pixels
+        above the high threshold are strong edges and are kept; pixels between
+        the thresholds are weak edges and are kept only if they connect to a
+        strong edge; everything below the low threshold is discarded.
+\end{enumerate}
+\noindent
+Hysteresis removes isolated noise responses while preserving long, coherent
+boundaries. The detector fails where the image offers no contrast: low-contrast
+boundaries, haze, and gradual transitions stay below threshold, and strong
+texture produces fragmented contours. The smoothing width and the two thresholds
+must be tuned to the imaging conditions.
+
+\section{Fourier Transform and Fourier Descriptors}
+\label{app:fourier}
+
+The Fourier transform rewrites a signal as a sum of sinusoids of different
+frequencies; the list of their complex weights is the \emph{spectrum}. Low
+frequencies describe the coarse shape of a signal, high frequencies its fine
+detail and noise. Two applications appear in object models: correlating
+gradient images quickly as an alternative to R-tables, and describing a closed
+contour by the spectrum of its boundary (Fourier descriptors). Both need only the
+facts collected here.
+
+\subsection{The Discrete Fourier Transform}
+
+For a discrete signal $x(0),\dots,x(N-1)$ the discrete Fourier transform (DFT)
+and its inverse are
+\begin{equation}
+  X(k) = \sum_{n=0}^{N-1} x(n)\, e^{-2\pi i kn/N},
+  \qquad
+  x(n) = \frac{1}{N}\sum_{k=0}^{N-1} X(k)\, e^{2\pi i kn/N}.
+\end{equation}
+\noindent
+The spectrum has as many coefficients as the signal has samples, and it is
+periodic, $X(k) = X(k+N)$, so the upper half of the indices can equally be read
+as negative frequencies: $X(N-1) = X(-1)$, $X(N-2) = X(-2)$, and so on.
+Implementations therefore often store the spectrum as
+$[X(0),X(1),\dots,X(N/2),X(-N/2),\dots,X(-2),X(-1)]$. The zero-frequency term
+$X(0) = \sum_n x(n)$ is $N$ times the mean of the signal.
+
+\paragraph{Real signals.}
+If $x$ is real-valued, the spectrum is \emph{Hermitian}: $X(-k) = X(k)^*$,
+where $^*$ is complex conjugation. Half of the spectrum then determines the
+other half. For example, if a real signal with $N=17$ samples has
+$X(0),\dots,X(8) = [10,\ -5+i,\ -0.5+0.2i,\ -0.04+0.03i,\ 0,0,0,0,0]$, the
+remaining entries $X(-8),\dots,X(-1)$ are
+$[0,0,0,0,0,\ -0.04-0.03i,\ -0.5-0.2i,\ -5-i]$: conjugate and mirror, without
+changing the sign of the real parts.
+
+\paragraph{Standard spectra.}
+Table~\ref{tab:fourier-pairs} lists the transform pairs used most often.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{4.2cm}p{8.8cm}@{}}
+    \toprule
+    Signal & Spectrum \\
+    \midrule
+    $\cos(2\pi f_0 x)$ & two real spikes at $\pm f_0$ \\
+    $\sin(2\pi f_0 x)$ & two imaginary spikes at $\pm f_0$ with opposite signs \\
+    rectangle of width $w$ & sinc function, $\propto \operatorname{sinc}(wf)$;
+      a narrower rectangle gives a wider sinc \\
+    sinc function & rectangle (ideal low-pass) \\
+    Gaussian & Gaussian; a narrow Gaussian gives a wide one \\
+    \bottomrule
+  \end{tabular}
+  \caption{Common Fourier pairs. Width in the signal domain and width in the
+  frequency domain are inversely related.}
+  \label{tab:fourier-pairs}
+\end{table}
+
+\paragraph{Convolution and correlation theorems.}
+Convolution in the signal domain is multiplication in the frequency domain, and
+correlation is the same with \emph{one} factor conjugated:
+\begin{equation}
+  f * g = \mathrm{DFT}^{-1}\bigl(\mathrm{DFT}(f)\cdot\mathrm{DFT}(g)\bigr),
+  \qquad
+  f \star g = \mathrm{DFT}^{-1}\bigl(\mathrm{DFT}(f)^*\cdot\mathrm{DFT}(g)\bigr).
+  \label{eq:corr-theorem}
+\end{equation}
+\noindent
+Conjugating both factors, or neither, does not give the correlation. The
+practical value is speed: a correlation of a template with a whole image costs
+two forward DFTs, a pointwise product, and one inverse DFT.
+
+\paragraph{Gradient correlation instead of R-tables.}
+Write the gradients of the image $I$ and of the template $O$ as complex numbers,
+\begin{equation}
+  I_I = \frac{\partial I}{\partial x} + i\,\frac{\partial I}{\partial y},
+  \qquad
+  O_I = \frac{\partial O}{\partial x} + i\,\frac{\partial O}{\partial y}.
+\end{equation}
+\noindent
+For two complex numbers $a = a_x + i a_y$ and $b = b_x + i b_y$ the product
+$a^* b = (a_x b_x + a_y b_y) + i\,(a_x b_y - a_y b_x)$ has the dot product of the
+two gradient vectors as its real part. Hence
+$\operatorname{Re}(I_I \star O_I)(x,y)$ sums, over the whole template placed at
+$(x,y)$, the dot products between template gradients and image gradients. It is
+large where many image edges have the position and orientation the template
+expects, which is almost the same as Hough voting with an R-table. The
+imaginary part contains cross products instead and is not the voting score.
+Equation~\eqref{eq:corr-theorem} computes the correlation for all positions at
+once.
+
+\subsection{Fourier Descriptors}
+
+A closed contour can be described as a periodic complex signal. Trace the
+boundary of a segmented object at $N$ points and write each point as one
+complex number,
+\begin{equation}
+  u(n) = x(n) + i\,y(n), \qquad n = 0,\dots,N-1 .
+\end{equation}
+\noindent
+The Fourier descriptor is its DFT, $F(\mu) = \mathrm{DFT}(u)(\mu)$ for
+$\mu = 0,\dots,N-1$. From a greyscale image the pipeline is therefore: segment the
+object, trace its boundary at $N$ points, form $u$, apply the DFT, normalize,
+and keep the low-frequency coefficients. Two counting facts follow directly
+from the DFT. The descriptor has exactly as many coefficients as the contour has
+points, so a descriptor $F(\mu)$ with $\mu\in\{0,\dots,69\}$ describes a contour
+of $70$ points, whatever the value of $F(0)$. And
+$F(0) = \sum_n u(n) = N\cdot(\bar x + i\,\bar y)$ is $N$ times the centroid: for
+a contour of $N = 20$ points centered at $(10,20)$, $F(0) = 200 + 400i$ (with a
+$1/N$-normalized DFT it would be the centroid $10 + 20i$ itself).
+
+\paragraph{How transformations act.}
+Each geometric change of the shape has a simple effect on the spectrum, which is
+what makes normalization possible (Table~\ref{tab:fd-norm}). A translation by
+$t = t_x + i t_y$ adds $t$ to every $u(n)$ and therefore only changes $F(0)$ (by
+$Nt$). A scaling by $a$ multiplies every coefficient by $a$. A rotation by
+$\varphi$ multiplies every coefficient by $e^{i\varphi}$, a pure phase change. A
+different start point on the contour multiplies $F(\mu)$ by a phase
+$e^{2\pi i\mu m/N}$ that grows with $\mu$.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.8cm}p{4.3cm}p{5.9cm}@{}}
+    \toprule
+    Invariance to & Effect on $F$ & Normalization \\
+    \midrule
+    Translation & changes only $F(0)$ & set $\tilde F(0) := 0$ \\
+    Scale & multiplies all $F(\mu)$ by $a$ & divide by $\lvert F(k)\rvert$ for a
+      fixed $k\neq 0$, e.g.\ $k=1$ \\
+    Rotation & multiplies all $F(\mu)$ by $e^{i\varphi}$ & keep magnitudes
+      $\lvert F(\mu)\rvert$ (or normalize the phase) \\
+    Start point & phase $e^{2\pi i \mu m/N}$ & keep magnitudes
+      $\lvert F(\mu)\rvert$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Normalizing a Fourier descriptor. Each step removes one nuisance
+  transformation; mirroring and noise are not removed by any of them.}
+  \label{tab:fd-norm}
+\end{table}
+
+\noindent
+The normalization $\tilde F(0) := 0$, $\tilde F(\mu) := F(\mu)/\lvert F(2)\rvert$
+therefore makes the descriptor invariant to translation (first step) and to
+scale (second step, with $k=2$). It is not invariant to rotation, because the
+phases are kept. It is not invariant to mirroring, since mirroring conjugates
+$u$ and exchanges positive and negative frequencies. Noise is never removed by
+normalization. Plots of normalized descriptors can be recognized by the same
+rules: the zero-frequency value is zero after translation normalization, the
+reference coefficient has magnitude $1$ after scale normalization, and all
+values are real and non-negative after taking magnitudes.
+
+\paragraph{Smoothing a shape.}
+Fine detail and noise of the contour live in the high frequencies, which are the
+indices in the middle of the stored array (large $\lvert\mu\rvert$). A shape is
+smoothed by a low-pass operation: set those coefficients to zero or attenuate
+them, keep the low frequencies at both ends of the array, and apply the inverse
+DFT. Keeping only magnitudes destroys the shape, because the phases carry the
+positions of the points. Dividing the whole spectrum by a constant only rescales
+the shape and does not smooth it.
+
+\paragraph{Limitations.}
+Fourier descriptors need a clean segmentation and one closed, connected contour.
+They are global: a partial occlusion, or two touching objects, changes the whole
+contour and therefore every coefficient. The number of contour points and the
+sampling must be consistent across shapes to compare descriptors.
+
+\section{Classical Classifiers and Part-Based Detectors}
+\label{app:classifiers}
+
+The classification stage of the processing chain in
+Figure~\ref{fig:processing-chain} can be filled by many learners. Part-based
+detectors build on them. This appendix covers the classifiers and two
+detectors that exercises ask about beyond the implicit shape model: the Hough
+forest and the deformable part model. For each, the aim is to know its working
+principle and what exactly it outputs.
+
+\paragraph{Linear classifiers and SVMs.}
+A linear classifier decides by the sign of an affine function,
+$g(x) = w^\top x + b$; its decision boundary is a hyperplane. For linearly
+separable data many hyperplanes classify the training set correctly. A
+\emph{linear support vector machine} (SVM) picks the one with the
+\emph{maximum margin}: the hyperplane whose distance to the nearest training
+samples of both classes is largest, running through the middle of the gap. Only
+these nearest samples, the support vectors, determine it. A soft-margin variant
+tolerates some misclassified samples, and kernels allow nonlinear boundaries.
+In a figure with several separating lines, the SVM line is the one that keeps
+equal and largest distance to both classes, not one that touches a sample.
+
+\paragraph{Random forests.}
+A decision tree routes a sample through binary node tests (for example ``is
+feature $j$ larger than $\tau$?'') to a leaf that stores a class distribution.
+During training, each node picks, from a set of randomly generated candidate
+tests, the one that best reduces the class entropy of the samples it splits
+(information gain). A random forest trains many trees, each on a random subset
+of the data and with random candidate tests, and averages the leaf
+distributions of all trees. The randomness makes the trees differ, so their
+average has lower variance than any single tree.
+
+\paragraph{Hough forests.}
+A Hough forest is a random forest whose trees vote like the implicit shape
+model. Training samples are image patches, each labeled as object or background
+and, for object patches, with the offset vector to the object center. The node
+tests are simple and fast: compare the values of one feature channel (intensity,
+gradient, and so on) at two pixel positions inside the patch,
+$f(p) < f(q) + \tau$. Each node is optimized for one of two energies, chosen at
+random: the \emph{class-label uncertainty} (entropy of object versus background)
+or the \emph{offset uncertainty} (variance of the offset vectors of the object
+patches). Each leaf stores the fraction of object patches that reached it (a
+class probability) and the list of their offset vectors. At detection time every
+patch of the image descends all trees, and each leaf casts its offsets as votes
+for the object center, weighted by its class probability. The codebook and its
+matching step are thus replaced by a learned mapping from appearance to votes.
+
+\paragraph{Deformable part models.}
+A deformable part model (DPM) describes an object by a coarse \emph{root}
+filter on HOG features, several \emph{part} filters at twice the resolution,
+and a quadratic deformation cost for each part's displacement from its anchor
+position. The score of a hypothesis with root position $p_0$ is
+\begin{equation}
+  \mathrm{score}(p_0) = F_0\cdot\phi(p_0)
+  + \sum_{i=1}^{n} \max_{p_i}\Bigl[F_i\cdot\phi(p_i)
+  - d_i\cdot\bigl(dx_i,\,dy_i,\,dx_i^2,\,dy_i^2\bigr)\Bigr] + b,
+\end{equation}
+\noindent
+where $\phi(p)$ is the HOG feature window at position $p$, $F_i$ are the filter
+weights, and $(dx_i,dy_i)$ is part $i$'s displacement from its anchor. The part
+positions are latent variables, and the filters are trained with a latent SVM.
+Localization is a sliding-window search: the score is evaluated at every
+position and scale of a HOG feature pyramid, and the high-scoring windows,
+after non-maxima suppression, are the detections. The SVM only outputs a score
+for a given window, not a location. Objects are found by classifying windows at
+many locations, not by a codebook and Hough voting.

@@ -274,7 +274,10 @@ need to try every $\theta$: we compute the single matching $r$ from
 Equation~\eqref{eq:line-rtheta} and update one cell instead of a whole sinusoid.
 (The function $\operatorname{atan2}$ is the two-argument arctangent; unlike
 $\arctan(G_y/G_x)$ it returns the angle in the correct quadrant and does not
-divide by zero when $G_x = 0$.) Finally, a sharp, high-contrast edge is stronger
+divide by zero when $G_x = 0$.) Two conventions matter when reading exercises:
+gradients point from dark to bright, and angles are measured counter-clockwise
+from the $x$-axis. How $G_x$ and $G_y$ are computed with derivative filters is
+summarized in Appendix~\ref{app:edges}. Finally, a sharp, high-contrast edge is stronger
 evidence for a line than a faint one, so instead of adding a flat $+1$ we weight
 each vote by the gradient magnitude,
 \begin{equation}
@@ -296,6 +299,67 @@ forces a higher peak threshold. An oriented edge, by contrast, carries a
 direction, pins down $\theta$ through Equation~\eqref{eq:gradient-angle}, and
 votes for essentially one line. The lesson generalizes: the more informative each
 piece of local evidence is, the cleaner the peaks and the fewer the false alarms.
+The two modes carry two names. Letting a point sweep over all $\theta$ and trace
+its full sinusoid is the \emph{Radon} view: a point in image space becomes a
+sinusoid in parameter space. The gradient-based \emph{Hough} line detector maps
+an oriented edge pixel to a single point in parameter space.
+
+\paragraph{Working with the parameterization.}
+Three kinds of exercise follow directly from Equation~\eqref{eq:line-rtheta}.
+First, to test whether a line $(\theta,r)$ passes through a point, substitute the
+point and compare. For the point $(x,y)=(3,7)$:
+\begin{center}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    $(\theta, r)$ & $x\cos\theta + y\sin\theta$ & on the line? \\
+    \midrule
+    $(0.5\pi,\ 3)$ & $3\cdot 0 + 7\cdot 1 = 7$ & no ($7\neq 3$) \\
+    $(0,\ 7)$ & $3\cdot 1 + 7\cdot 0 = 3$ & no ($3\neq 7$) \\
+    $(0,\ 3)$ & $3$ & yes \\
+    $(0.75\pi,\ -7)$ & $3\cdot(-\tfrac{\sqrt2}{2}) + 7\cdot\tfrac{\sqrt2}{2}
+      = 2\sqrt2 \approx 2.83$ & no \\
+    \bottomrule
+  \end{tabular}
+\end{center}
+\noindent
+The pattern to remember: $\theta = 0$ describes the vertical line $x = r$,
+$\theta = \pi/2$ the horizontal line $y = r$.
+
+Second, to count the votes a pixel casts, count the parameter cells it
+increments. Suppose $\theta$ is discretized in $1^\circ$ steps over
+$0^\circ,\dots,359^\circ$ and $r$ over $-100,\dots,100$. Without gradient
+information a point votes once per $\theta$ column, $360$ votes (one $r$ per
+$\theta$, never all $201$ values of $r$). With its gradient
+$(G_x,G_y)$ the orientation $\theta$ is fixed by
+Equation~\eqref{eq:gradient-angle}, $r$ follows from the Hesse form, and the
+pixel casts exactly \emph{one} vote.
+
+Third, to recognize the shape behind a voting space, count the peaks. Every
+straight segment is one line and produces one peak; two parallel sides share
+$\theta$ and differ only in $r$, so they give two peaks in the same column.
+A triangle therefore gives three peaks, a square or parallelogram four (in two
+pairs), and a circle none at all: each of its tangent lines touches only one
+point, so the votes spread evenly over a band $|r|\le R$ whose edges are
+merely brighter where many tangents nearly coincide.
+Figure~\ref{fig:hough-shapes} shows these four voting spaces; a space with three
+maxima can only come from the triangle. By the same logic, two isolated pixels
+produce two sinusoids that cross in exactly one cell, the unique line through
+both of them. Circles are detected with a different parameterization,
+$(x-x_c)^2 + (y-y_c)^2 = R^2$, whose voting space is three-dimensional
+$(x_c,y_c,R)$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/hough_shape_spaces.pdf}
+  \caption{Line voting spaces of four outlines (every contour point votes for all
+  $\theta\in[0^\circ,180^\circ)$, signed $r$). Each straight side is one peak:
+  three for the triangle, four for the square and the parallelogram, whose
+  parallel sides appear as peak pairs at the same $\theta$. A side at
+  $\theta=0^\circ$ reappears at the right border as $\theta=180^\circ$ with
+  opposite sign of $r$, which is the same line. The circle has no isolated peak,
+  only a uniform band between $r=-R$ and $r=R$.}
+  \label{fig:hough-shapes}
+\end{figure}
 
 \subsection{Detecting Arbitrary Shapes: The Generalized Hough Transform}
 
@@ -406,6 +470,77 @@ The price of this generality is the four-dimensional search; the reward is a
 detector for an \emph{arbitrary} known shape rather than a single parametric
 family of lines.
 
+\paragraph{Transforming an R-table.}
+The prediction loop builds a modified R-table for every candidate $(s,\varphi)$,
+and exercises ask for exactly this step. Three rules cover every case. A
+\emph{scale} $s$ multiplies every displacement vector and leaves the rows
+alone, since scaling does not change gradient directions. A counter-clockwise
+\emph{rotation} by $\varphi$ rotates every displacement vector,
+\begin{equation}
+  \begin{pmatrix} d_x' \\ d_y' \end{pmatrix}
+  = s
+  \begin{pmatrix} \cos\varphi & -\sin\varphi \\ \sin\varphi & \cos\varphi
+  \end{pmatrix}
+  \begin{pmatrix} d_x \\ d_y \end{pmatrix},
+  \label{eq:rtable-transform}
+\end{equation}
+\noindent
+\emph{and} rotates every gradient by $\varphi$, so the entries of the row for
+orientation $\theta$ move to the row for $\theta+\varphi$: a circular shift by
+$\varphi/\Delta\theta$ rows, where $\Delta\theta$ is the bin width. If the table
+only covers orientations in $[0^\circ,180^\circ)$, orientations are taken modulo
+$180^\circ$. A \emph{translation} changes nothing, because the displacements are
+relative to the reference point, which moves along with the shape.
+Three worked cases show how the rules combine:
+\begin{itemize}
+  \item Rows of width $45^\circ$ over $[0^\circ,180^\circ)$, $s=2$,
+        $\varphi = 180^\circ$. A rotation by $180^\circ$ maps $(d_x,d_y)$ to
+        $(-d_x,-d_y)$, and $\theta + 180^\circ \equiv \theta \pmod{180^\circ}$
+        keeps every entry in its row. With the scale, $(1,2)$ becomes
+        $(-2,-4)$, $(9,10)$ becomes $(-18,-20)$, and the empty row stays empty.
+  \item Rows of width $90^\circ$ over $[0^\circ,360^\circ)$, $s=1$,
+        $\varphi = 180^\circ$, translation $t=(10,10)$. Every vector is negated,
+        and every row moves two places on: the entries of $[0,90)$ go to
+        $[180,270)$, those of $[180,270)$ to $[0,90)$, those of $[270,360)$ to
+        $[90,180)$. The translation is ignored.
+  \item $s=2$, $\varphi = 45^\circ$, rows of width $45^\circ$. With
+        $\cos 45^\circ = \sin 45^\circ = 1/\sqrt2$,
+        Equation~\eqref{eq:rtable-transform} becomes
+        $(d_x',d_y') = \sqrt2\,(d_x - d_y,\ d_x + d_y)$, for example
+        $(2,0)\mapsto(2\sqrt2,\,2\sqrt2)$, and each entry moves one row on.
+\end{itemize}
+\noindent
+The same rules explain which invariances a single R-table has
+(Table~\ref{tab:rtable-props}).
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{4.2cm}p{1.6cm}p{7.2cm}@{}}
+    \toprule
+    Property & Holds? & Reason \\
+    \midrule
+    Invariant to translation & yes & displacements are relative to the
+      reference point \\
+    Invariant to scale & no & displacements must be multiplied by $s$ \\
+    Invariant to rotation & no & vectors must be rotated and rows shifted \\
+    Robust to noise and partial occlusion & yes & each edge votes on its own; a
+      missing part lowers the peak, noise adds scattered votes \\
+    Needs gradient orientation at $(x,y)$ & yes & the orientation selects the
+      row to vote with \\
+    \bottomrule
+  \end{tabular}
+  \caption{Properties of a single R-table. Scale and rotation are handled by the
+  extra accumulator dimensions, not by the table itself.}
+  \label{tab:rtable-props}
+\end{table}
+
+\noindent
+The dimensionality of the voting space follows from what is unknown: a line
+detector votes in 2D $(r,\theta)$, a circle detector in 3D $(x_c,y_c,R)$, and the
+generalized Hough transform in 4D $(x,y,s,\theta)$. An alternative to explicit
+R-tables correlates complex gradient images of template and image, which can be
+computed with the Fourier transform (Appendix~\ref{app:fourier}).
+
 \subsection{Where to Look: Salient Regions}
 
 The generalized Hough transform still assumes we possess an exact template of the
@@ -456,6 +591,27 @@ all $256$ levels are equally likely, $p(k) = 1/256$ for each and $H = \log_2 256
 entropy, and a textured, unpredictable patch is rare in this spatial sense, while
 a smooth or constant patch is not.
 
+Because Equation~\eqref{eq:entropy} depends only on the \emph{list} of histogram
+values, several properties follow immediately:
+\begin{itemize}
+  \item A patch whose histogram is uniform over all grey levels, such as pure
+        noise, has the highest possible entropy.
+  \item Relabeling grey values, for example swapping two of them, only permutes
+        the histogram bins and does not change the entropy.
+  \item Permuting the pixels leaves the histogram, and hence the entropy,
+        unchanged. A checkerboard and a single straight edge with the same
+        50/50 black-white split both have $H = 1$ bit.
+  \item A homogeneous patch ($H=0$) has lower entropy than a patch containing an
+        edge ($H>0$).
+\end{itemize}
+\noindent
+The third property also shows the weakness of the measure: the intensity
+distribution contains no spatial information. Ranking patches by entropy is
+therefore a matter of counting grey levels and their frequencies. A constant
+patch ($H=0$), a patch half black and half white ($H=1$), a patch with four
+equally frequent grey levels ($H=2$), and a noise patch ($H$ close to $8$) are in
+ascending order of entropy, whatever the arrangement of their pixels.
+
 High spatial entropy alone is still not enough, because pure noise also has a flat
 histogram yet is not distinctive: its statistics barely change as the analysis
 window grows, so it looks the same at every scale. We therefore add a second
@@ -495,6 +651,31 @@ complex (high $H_D$) and tied to a distinctive scale (high $W_D$). This is exact
 what suppresses featureless noise, whose entropy is high but flat across scale.
 Figure~\ref{fig:saliency-scale} shows the entropy-versus-scale curve with its
 peak, alongside the flat-versus-peaked histogram intuition.
+
+The two multi-scale representations mentioned above are not the same thing. An
+\emph{image pyramid} subsamples the image in logarithmic steps of resolution,
+$R_0, R_{-1}, R_{-2},\dots$, so each level is smaller. A \emph{linear Gaussian
+scale space} keeps the full resolution and instead smooths the original signal
+$L(x)$ with Gaussian kernels of growing width $t$,
+\begin{equation}
+  L(x,t) = L(x) * G(x,t), \qquad
+  G(x,t) = (\pi t)^{-n/2} \exp\!\left(-\frac{\lvert x\rvert^2}{t}\right),
+  \label{eq:scale-space}
+\end{equation}
+\noindent
+where $n$ is the dimension of $x$ ($n=2$ for images). A Gaussian scale space is
+therefore a family of images, all derived from the original and progressively
+more blurred as $t$ increases; it is not a pyramid with randomly drawn scales,
+nor an assumption about how object sizes are distributed.
+
+The scale weight also decides exercises that ask for the \emph{most salient}
+patch. Saliency in the sense of Kadir and Brady is $y = H_D\cdot W_D$ at a peak
+scale, not the entropy alone. A noise patch has the highest entropy of all, yet
+its statistics are the same at every scale, so $W_D$ is small and the patch is
+not salient. When a task only supplies entropy values, the ranking comes from
+those values, with patches that are known to be scale-less noise discounted.
+Entropy of the intensity distribution alone is not sufficient as a saliency
+measure because that distribution contains no spatial information.
 
 In practice the algorithm visits each pixel, computes the local entropy
 (Equation~\eqref{eq:entropy}) over a range of scales, keeps the scales where the
@@ -591,7 +772,9 @@ usefully with HOG. \emph{Fourier descriptors} encode a closed contour by the
 Fourier coefficients of its boundary curve; translation, rotation, and scaling of
 the shape act on those coefficients in simple, separable ways (a shift of the
 constant term, a phase change, an overall magnitude scaling), so after
-normalization the coefficients become invariant shape descriptors. \emph{Hu
+normalization the coefficients become invariant shape descriptors. Their
+construction, normalization, and use for smoothing are worked out in
+Appendix~\ref{app:fourier}. \emph{Hu
 moments} combine image moments into a handful of quantities that are likewise
 invariant to translation, scale, and rotation. For detecting the salient
 \emph{points} in the first place, the standard keypoint operators (Harris,
@@ -645,6 +828,24 @@ groups only genuinely similar patches. Finally, for each codebook entry we recor
 across all the training images, the offset vectors from every matching patch to
 the object center --- the appearance analogue of the R-table's displacement
 vectors, specifying where on the object each prototype part tends to appear.
+In order, training runs through five steps:
+\begin{enumerate}
+  \item extract salient points from the training images and cut out a patch at
+        each point's scale;
+  \item describe each patch by its local appearance (grey values or a keypoint
+        descriptor);
+  \item cluster similar appearances by iterative merging and store the cluster
+        centers as the codebook;
+  \item match the codebook entries against all training patches and activate
+        every entry whose similarity exceeds $t$;
+  \item for every activation, store the offset vector from the patch to the
+        object center with the activated entry.
+\end{enumerate}
+\noindent
+The codebook itself thus holds \emph{prototypes of object parts} with a stable
+appearance across images; the offsets to the reference point are attached to
+each entry afterwards. They play the role of the R-table rows, not of the
+codebook's content.
 
 The \textbf{prediction phase} runs the voting. Salient patches are extracted from
 the test image and matched against the codebook; an entry is \emph{activated}
@@ -693,7 +894,11 @@ directly to a distribution of votes, learning the appearance grouping and the
 offsets together in one trained predictor. \emph{Deformable part models} (DPM)
 take a complementary route: an object is a coarse root HOG template plus a few
 higher-resolution part templates attached to it by spring-like deformation costs,
-the whole thing scored with a latent-variable classifier. Both keep the central
+the whole thing scored with a latent-variable classifier. The Hough forest
+still votes, but learns the votes instead of looking them up in a codebook. DPM
+does not vote at all: it localizes objects by classifying windows of the HOG
+feature map at many positions and scales.
+Appendix~\ref{app:classifiers} gives the details needed for both. Both keep the central
 bargain of this section --- local parts proposing global configurations --- while
 changing how the parts are represented and how their votes are combined. The
 implicit shape model itself is due to Leibe, Leonardis, and Schiele (ECCV'04

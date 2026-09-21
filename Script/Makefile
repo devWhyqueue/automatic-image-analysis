@@ -1,6 +1,6 @@
 TEX := pdflatex
 MAIN := main
-TEX_SOURCES := $(MAIN).tex intro.tex neural_networks.tex visual_object_models.tex appendix_figures.tex
+TEX_SOURCES := $(MAIN).tex intro.tex neural_networks.tex visual_object_models.tex appendix_figures.tex appendix_supplements.tex
 FIGURES := $(wildcard figures/*)
 
 .PHONY: all clean distclean

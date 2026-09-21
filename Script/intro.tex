@@ -390,11 +390,135 @@ rather than category.
 \end{table}
 
 \noindent
-These tasks share the same underlying processing chain. Image acquisition and
-preprocessing produce reliable low-level measurements, mid-level analysis groups
-them into features and segments, and the high-level stage turns those into the
-task-specific output above. The choice of task fixes the form of the answer, but
-the bottom-up evidence and top-down knowledge feeding into it are the same.
+Classifying a real application means asking what the system has to output. A
+building access system that shows a face to a camera and matches it against a
+database of employee faces must decide \emph{which} person this is: that is
+object recognition in the narrow, identity sense. It needs no pixel labels
+(segmentation), no free-text description (captioning), and localization is only
+a helper step. A system that analyzes basketball games, draws boxes around
+players, reads their names and numbers, and states whether a player is
+dribbling, throwing, or defending combines several tasks: the boxes and
+identities are object detection and recognition, and the verbs describe
+activities over time, which is action recognition. Exam questions of this kind
+reward naming \emph{every} task whose output the system produces.
+
+\subsection{The Classical Processing Chain}
+
+All of these tasks share the same underlying processing chain. Image acquisition
+and preprocessing produce reliable low-level measurements, mid-level analysis
+groups them into features, and the high-level stage turns those into the
+task-specific output. In classical image analysis every stage is a separate,
+hand-designed module, and the order of the stages is fixed:
+Figure~\ref{fig:processing-chain} shows it and Table~\ref{tab:processing-chain}
+gives one example per stage.
+
+\begin{figure}[ht]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+      node distance=0.45cm,
+      stage/.style={draw, rounded corners, align=center, minimum width=2.25cm,
+        minimum height=1.05cm, font=\small},
+      arrow/.style={-{Latex[length=2.4mm]}, thick}
+    ]
+    \node[stage, fill=gray!10] (acq) {image\\acquisition};
+    \node[stage, fill=blue!8, right=of acq] (pre) {data\\preprocessing};
+    \node[stage, fill=green!8, right=of pre] (fe) {feature\\extraction};
+    \node[stage, fill=green!8, right=of fe] (fp) {feature\\preprocessing};
+    \node[stage, fill=orange!12, right=of fp] (cl) {classification};
+    \node[stage, fill=red!8, right=of cl] (post) {post-\\processing};
+    \draw[arrow] (acq) -- (pre);
+    \draw[arrow] (pre) -- (fe);
+    \draw[arrow] (fe) -- (fp);
+    \draw[arrow] (fp) -- (cl);
+    \draw[arrow] (cl) -- (post);
+    \node[font=\small, below=0.25cm of pre] {pixel space};
+    \node[font=\small, below=0.25cm of fp] {feature space};
+    \node[font=\small, below=0.25cm of post] {output space};
+  \end{tikzpicture}%
+  }
+  \caption{The classical image-analysis processing chain. Data preprocessing
+  stays in pixel space, feature extraction maps pixels to a feature space, and
+  only the classifier maps features to the output space of labels.}
+  \label{fig:processing-chain}
+\end{figure}
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.2cm}p{4.6cm}p{5.2cm}@{}}
+    \toprule
+    Stage & Mapping & Typical example \\
+    \midrule
+    Image acquisition & scene $\rightarrow$ image & camera, sensor, sampling \\
+    Data preprocessing & image $\rightarrow$ image & denoising, histogram
+      equalization to remove illumination differences \\
+    Feature extraction & image $\rightarrow$ feature vector & intensity
+      histogram, HOG, bag of visual words \\
+    Feature preprocessing & features $\rightarrow$ features & normalization,
+      feature selection, dimensionality reduction \\
+    Classification & features $\rightarrow$ label & linear classifier, SVM,
+      random forest, MLP \\
+    Postprocessing & labels $\rightarrow$ labels & smoothing label maps,
+      non-maxima suppression of detections \\
+    \bottomrule
+  \end{tabular}
+  \caption{One example per stage of the processing chain. The stage is decided
+  by what goes in and what comes out: an operation that returns an image is
+  preprocessing, one that returns a feature vector is feature extraction.}
+  \label{tab:processing-chain}
+\end{table}
+
+\noindent
+The mapping column is the tool for sorting any method into its stage. Applying
+a transformation so that all images of a dataset have approximately the same
+histogram changes pixel values but still outputs images, so it is \emph{data}
+preprocessing, not feature extraction. Feature extraction maps from pixel space
+into a \emph{feature} space, not directly into the output space; turning features
+into labels is the classifier's job.
+
+\paragraph{Two classical features.}
+The simplest image feature is the \emph{intensity histogram}: count how many
+pixels take each grey value and normalize the counts. The histogram ignores
+where the pixels are, so rotating (or mirroring, or shuffling) the image leaves
+it unchanged; it is rotation invariant. It is \emph{not} illumination invariant,
+because brightening the scene shifts all values and therefore the histogram.
+The \emph{bag of visual words} (BoVW) transfers the same counting idea from grey
+values to image parts:
+\begin{enumerate}
+  \item detect keypoints in all training images and describe each by a local
+        descriptor;
+  \item cluster the descriptors (e.g.\ with $k$-means); each cluster center is a
+        \emph{visual word}, and together they form the vocabulary;
+  \item for an image, assign every keypoint to its nearest word and count how
+        often each word occurs, which gives a word histogram;
+  \item compare this histogram with those of the database images, or feed it to
+        a classifier.
+\end{enumerate}
+\noindent
+Like the intensity histogram, BoVW records \emph{which} parts occur, but not
+\emph{where}: it describes no spatial relations between the patches. Part-based
+models that keep the geometry, such as the implicit shape model of
+Section~\ref{sec:visual-object-models}, replace the plain count by votes with
+offset vectors.
+
+\paragraph{From classifier to detector.}
+A classifier trained on image patches of a fixed size answers only ``is this
+patch an object?'' Turning it into a detector requires three additions. First,
+a \emph{sliding window} applies the classifier at every position of the image.
+Second, an \emph{image pyramid} rescales the image to several resolutions so
+that objects of different sizes fit the fixed window. Third, each positive
+response gives a bounding box, whose size follows from the pyramid level and
+whose position follows from the window location; overlapping boxes around the
+same object are then reduced to the strongest one by \emph{non-maxima
+suppression}.
+
+\paragraph{Where deep learning fits.}
+Deep networks do not remove the stages but merge them: a single differentiable
+model can learn preprocessing, feature extraction, feature selection, and
+classification jointly from data. A neural network can therefore play any of
+these roles alone, as a learned feature extractor whose activations feed another
+classifier, as a feature selector, or as the classifier on top of hand-crafted
+features.
 
 \subsection{Models, Data, and Evaluation}
 
