@@ -11,6 +11,16 @@ solve exam and exercise questions after studying script. When writing or
 revising chapter, check which exercise/exam tasks touch its topics. Ensure script
 covers concepts, formulas, and worked reasoning needed to solve them.
 
+Exam/exercise tasks only loosely tied to lectures go into appendix
+(`Script/appendix_supplements.tex`), not forced into chapter story. Rule: topic
+appears in exercises/exams but barely or not in lectures, and fits scope of
+existing chapters (e.g. edge detection, Fourier transform and descriptors,
+classical classifiers, Hough forest, DPM). Keep each appendix unit brief and
+limited to necessary knowledge: broad intuition of domain first, then specific
+thing exams ask, then knowledge required to solve it. Chapter text links to
+appendix with one pointer sentence. Tasks belonging to later lectures (e.g. CNN
+arithmetic, Bayes, RNN) wait for their own chapter, not appendix.
+
 ## LaTeX Script Preferences
 
 - Compile only one PDF: `Script/main.pdf`.
