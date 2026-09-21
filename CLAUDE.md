@@ -6,6 +6,13 @@ This repository contains course material for Automatic Image Analysis and a
 LaTeX script project in `Script/`. The script should become an explanatory
 learning document, not just a plain summary.
 
+The script explains the lectures (`Lectures/`), but every chapter must also
+take the corresponding exercises (`Exercises/`) and exam tasks (`Exams/`) into
+account. The overarching goal is that a reader can successfully solve exam and
+exercise questions after studying the script. When writing or revising a
+chapter, check which exercise and exam tasks touch its topics, and make sure the
+script covers the concepts, formulas, and worked reasoning needed to solve them.
+
 ## LaTeX Script Preferences
 
 - Compile only one PDF output for the script: `Script/main.pdf`.
@@ -34,8 +41,6 @@ learning document, not just a plain summary.
   concrete.
 - Avoid overly dense generated infographics. Prefer simple, local TikZ diagrams
   that explain one idea clearly.
-- For NotebookLM-generated artifacts, use them as source material or references,
-  but only include them visually when they are simple and readable.
 
 ## Visuals And Math
 
@@ -57,40 +62,10 @@ learning document, not just a plain summary.
 - Build from `Script/` with:
 
   ```bash
-  make TEX=/mnt/c/texlive/2026/bin/windows/pdflatex.exe
+  make TEX=/c/texlive/2026/bin/windows/pdflatex.exe
   ```
 
 - Run `make clean` after successful builds to remove LaTeX auxiliary files.
 - If included `.tex` files or figure assets are added, update `Script/Makefile`
   so changes trigger a rebuild.
 - Do not leave stale separate PDFs for included sections.
-
-## NotebookLM Usage
-
-- The project NotebookLM notebook is:
-  `91561820-4d1f-42dc-a7f3-9975ec459895`.
-- Use NotebookLM reports, source guides, and focused queries as supporting
-  synthesis for writing.
-- Generated NotebookLM visuals can be downloaded for reference, but simplify or
-  replace them if they are too complex for the script.
-
-### notebooklm CLI Setup
-
-The `notebooklm` CLI is **not** on the system PATH. It is installed in a
-project-local uv venv. Always invoke it as:
-
-```powershell
-d:\Git\automatic-image-analysis\.venv\Scripts\notebooklm.exe <command>
-```
-
-If the venv does not exist yet (e.g. fresh clone), set it up with:
-
-```powershell
-uv venv .venv
-uv pip install --python .venv\Scripts\python.exe "notebooklm-py[browser]"
-.venv\Scripts\playwright.exe install chromium
-.venv\Scripts\notebooklm.exe login
-```
-
-Auth is stored in `~/.notebooklm/profiles/default/storage_state.json` and
-persists across sessions. Re-run `login` only if commands return an auth error.

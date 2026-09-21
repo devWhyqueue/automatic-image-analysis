@@ -8,6 +8,12 @@
 \usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
+% placeins is not installed: flush pending floats before each \section
+\usepackage{etoolbox}
+\makeatletter
+\newcommand\FloatBarrier{\ifx\@toplist\@empty\ifx\@botlist\@empty\ifx\@deferlist\@empty\else\clearpage\fi\fi\else\clearpage\fi}
+\pretocmd{\section}{\FloatBarrier}{}{}
+\makeatother
 \usepackage{tikz}
 \usepackage[hidelinks]{hyperref}
 \usepackage[margin=2.5cm]{geometry}
