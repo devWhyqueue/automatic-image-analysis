@@ -60,13 +60,16 @@ arithmetic, Bayes, RNN) wait for their own chapter, not appendix.
 
 ## Build And Verification
 
-- Build from `Script/` with:
+- After changing `.tex` files, recompile `Script/main.pdf` from `Script/`
+  (run twice so references and table of contents update):
 
   ```bash
-  make TEX=/c/texlive/2026/bin/windows/pdflatex.exe
+  /c/texlive/2026/bin/windows/pdflatex.exe -interaction=nonstopmode main.tex
   ```
 
-- Run `make clean` after successful builds to remove LaTeX auxiliary files.
-- When adding included `.tex` files or figure assets, update `Script/Makefile`
-  so changes trigger rebuild.
+- Leave auxiliary files in place; they are gitignored.
 - No stale separate PDFs for included sections.
+
+## Git
+
+- Never create new branches. Commit directly on the current branch.
