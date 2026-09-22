@@ -1,0 +1,644 @@
+\section{Residual Networks}
+\label{sec:resnet}
+
+The convolutional networks of Section~\ref{sec:cnn} became better with every
+added layer, from the eight layers of AlexNet to the nineteen of VGG. It is
+tempting to continue: if $19$ layers beat $8$, then $50$ or $200$ layers should
+be better still. In practice, simply stacking more layers soon stops working.
+Signals shrink or explode on their way through the network, gradients become
+erratic, and beyond a certain depth even the \emph{training} error goes up.
+
+Three techniques together make very deep networks trainable, and all modern
+image networks use them. \emph{Careful parameter initialization} keeps the size
+of activations and gradients constant from layer to layer at the start of
+training. \emph{Residual connections} add the input of each block to its output,
+which gives the gradient a direct path through the network. \emph{Batch
+normalization} rescales activations during training so that they stay in a
+well-behaved range. This section explains each technique, starting with the
+problem it solves, and then presents the architectures built from them: ResNet,
+DenseNet, U-Net, and stacked hourglass networks.
+
+\subsection{Initialization and the Variance of Activations}
+
+Training starts from randomly chosen parameters. A common choice sets all biases
+to zero and draws every weight from a normal distribution with mean zero and
+variance $\sigma_\Omega^2$. The value of $\sigma_\Omega^2$ looks like a minor
+detail, but in a deep network it decides whether training can start at all.
+Every layer multiplies the signal by a weight matrix. If the weights are small,
+the activations of the next layer are likely to be smaller than those of the
+current layer; after fifty layers they have practically vanished. If the weights
+are large, the activations grow from layer to layer and eventually overflow.
+The backward pass also multiplies by the (transposed) weight matrices, so the
+same happens to the gradients. This is the \emph{vanishing gradient} and the
+\emph{exploding gradient} problem: the early layers receive gradients that are
+either far too small to change anything or so large that every update destroys
+what was learned.
+
+\paragraph{How the variance propagates.}
+The right value of $\sigma_\Omega^2$ follows from tracking the variance of the
+signal through one layer. Let $f_j$ be the pre-activations of layer $k$, with
+mean zero and variance $\sigma_f^2$. The layer applies ReLU,
+$h_j = \max(0, f_j)$, and the next layer computes the pre-activations
+\begin{equation}
+  f'_i = \beta_i + \sum_{j=1}^{D_h} \Omega_{ij} h_j ,
+\end{equation}
+where $D_h$ is the number of units in layer $k$. With zero biases and weights
+that are independent of the activations, the variance of $f'_i$ is the sum of
+the variances of the $D_h$ products. Each product has variance
+$\sigma_\Omega^2\,\mathbb{E}[h_j^2]$. Because $f_j$ is symmetric around zero,
+ReLU sets half of the values to zero and keeps the other half, so
+$\mathbb{E}[h_j^2] = \sigma_f^2/2$. Together,
+\begin{equation}
+  \sigma_{f'}^2 = \sigma_\Omega^2 \sum_{j=1}^{D_h} \frac{\sigma_f^2}{2}
+  = \frac{1}{2} D_h\, \sigma_\Omega^2\, \sigma_f^2 .
+  \label{eq:var-propagation}
+\end{equation}
+\noindent
+Each layer therefore multiplies the variance by the factor
+$\tfrac12 D_h \sigma_\Omega^2$. The variance stays constant exactly when this
+factor is one, that is, when
+\begin{equation}
+  \sigma_\Omega^2 = \frac{2}{D_h} .
+  \label{eq:he-forward}
+\end{equation}
+
+\paragraph{He initialization.}
+The backward pass leads to the same argument with the roles of the layers
+swapped. The gradient with respect to the activations of layer $k$ is a sum over
+the $D_{h'}$ units of layer $k+1$, so keeping the gradient variance constant
+requires $\sigma_\Omega^2 = 2/D_{h'}$. When the two layers have different sizes,
+the two conditions cannot both hold, and the usual compromise uses the mean of
+$D_h$ and $D_{h'}$:
+\begin{equation}
+  \sigma_\Omega^2 = \frac{2}{(D_h + D_{h'})/2} = \frac{4}{D_h + D_{h'}} .
+  \label{eq:he-init}
+\end{equation}
+\noindent
+This rule is called \emph{He} or \emph{Kaiming initialization}. It assumes ReLU
+activations; the factor $2$ compensates for the half of the signal that ReLU
+removes. For convolutional layers, $D_h$ is the number of inputs of one output
+unit, $C_i K^2$ for kernel size $K$ and $C_i$ input channels.
+
+\paragraph{Worked example: fifty layers of width 100.}
+Consider a network with $50$ hidden layers of $D_h = 100$ units each. By
+Eq.~\eqref{eq:var-propagation} the variance is multiplied by
+$\tfrac12 \cdot 100 \cdot \sigma_\Omega^2 = 50\,\sigma_\Omega^2$ per layer, so
+after $50$ layers by $(50\,\sigma_\Omega^2)^{50}$.
+He initialization gives $\sigma_\Omega^2 = 2/100 = 0.02$ and a factor of exactly
+$1$. Choosing $\sigma_\Omega^2 = 0.1$ looks harmless, but gives a factor of $5$
+per layer and $5^{50} \approx 10^{35}$ overall; $\sigma_\Omega^2 = 0.01$ gives
+$0.5^{50} \approx 10^{-15}$. Figure~\ref{fig:init-variance} shows these growth
+curves. The backward pass behaves in the same way, with the gradient variance
+growing or shrinking from the output back to the input. With $32$-bit floating
+point numbers (range about $10^{\pm38}$), the settings far from $0.02$ make
+training impossible before it begins.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[x=0.1cm, y=0.035cm]
+    \draw[-{Latex[length=2mm]}] (0,-80) -- (0,100);
+    \draw[-{Latex[length=2mm]}] (0,-80) -- (58,-80);
+    \foreach \t in {-50,0,50} {
+      \draw (-1,\t) -- (1,\t);
+      \node[left, font=\small] at (-1,\t) {$10^{\t}$};
+    }
+    \foreach \t in {0,25,50} {
+      \draw (\t,-81.5) -- (\t,-78.5);
+      \node[below=2pt, font=\small] at (\t,-82) {$\t$};
+    }
+    \node[font=\small] at (29,-106) {layer $k$};
+    \node[rotate=90, font=\small] at (-15,10) {variance of $h_k$};
+    \draw[very thick, red!70!black] (0,0) -- (50,84.9);
+    \draw[very thick, orange!80!black] (0,0) -- (50,34.9);
+    \draw[very thick, gray] (0,0) -- (50,0);
+    \draw[very thick, teal] (0,0) -- (50,-15.1);
+    \draw[very thick, blue!70!black] (0,0) -- (50,-65.1);
+    \node[right, font=\small] at (50,84.9) {$\sigma_\Omega^2 = 1$};
+    \node[right, font=\small] at (50,34.9) {$0.1$};
+    \node[right, font=\small] at (50,2) {$0.02$ (He)};
+    \node[right, font=\small] at (50,-17) {$0.01$};
+    \node[right, font=\small] at (50,-65.1) {$0.001$};
+  \end{tikzpicture}
+  \caption{Variance of the activations in a network with $50$ layers of $100$
+  ReLU units, on a logarithmic scale, for five weight variances. Only He
+  initialization, $\sigma_\Omega^2 = 2/D_h = 0.02$, keeps the variance constant;
+  all other choices change it by many orders of magnitude.}
+  \label{fig:init-variance}
+\end{figure}
+
+\noindent
+Initialization only controls the network at the start of training; once the
+weights change, the variances drift again. Pre-trained weights, discussed for
+transfer learning in Section~\ref{sec:cnn}, are a different kind of
+initialization: they start from weights that already encode useful features
+instead of from random numbers with the right scale.
+
+\subsection{Why Deeper Plain Networks Fail}
+
+A network processes its input sequentially. Each layer receives the output of
+the previous layer, so a network with four layers is a chain of nested
+functions,
+\begin{equation}
+  \mathbf{h}_1 = \mathbf{f}_1[\mathbf{x}, \boldsymbol{\phi}_1],\quad
+  \mathbf{h}_2 = \mathbf{f}_2[\mathbf{h}_1, \boldsymbol{\phi}_2],\quad
+  \mathbf{h}_3 = \mathbf{f}_3[\mathbf{h}_2, \boldsymbol{\phi}_3],\quad
+  \mathbf{y} = \mathbf{f}_4[\mathbf{h}_3, \boldsymbol{\phi}_4],
+\end{equation}
+or in one line
+$\mathbf{y} = \mathbf{f}_4\bigl[\mathbf{f}_3\bigl[\mathbf{f}_2\bigl[\mathbf{f}_1[\mathbf{x}]\bigr]\bigr]\bigr]$.
+Here $\mathbf{f}_k$ may be a single layer or a group of layers, and
+$\boldsymbol{\phi}_k$ are its parameters.
+
+\paragraph{Degradation: training error rises with depth.}
+Even with good initialization, adding layers helps only up to a point. On the
+CIFAR-10 dataset, a plain convolutional network with $56$ layers has a higher
+error than one with $20$ layers, and this holds not only for the test error but
+already for the \emph{training} error. This is not overfitting. An overfitting
+model fits the training set too well; here the deeper model fits it worse,
+although it could in principle copy the $20$-layer network and set its extra
+layers to the identity. The deeper network is harder to \emph{optimize}.
+
+\paragraph{Shattered gradients.}
+A likely reason is that the gradients of deep networks are \emph{shattered}.
+Gradient descent takes finite steps and relies on the gradient being roughly
+constant over the length of one step. In a shallow network, the gradient with
+respect to an early-layer parameter changes smoothly as the parameter changes.
+In a deep network it changes quickly and unpredictably, even for tiny parameter
+changes, and looks almost like noise; a step along the gradient then no longer
+reliably reduces the loss. The chain rule shows where this comes from. The
+derivative of the output with respect to the first layer is
+\begin{equation}
+  \frac{\partial \mathbf{y}}{\partial \mathbf{f}_1}
+  = \frac{\partial \mathbf{f}_4}{\partial \mathbf{f}_3}\,
+    \frac{\partial \mathbf{f}_3}{\partial \mathbf{f}_2}\,
+    \frac{\partial \mathbf{f}_2}{\partial \mathbf{f}_1} .
+  \label{eq:plain-chain}
+\end{equation}
+\noindent
+Every factor is evaluated at activations that are computed from $\mathbf{f}_1$.
+When the parameters of the first layer change, all factors in the product change
+at once, and the product of many changing matrices varies in an increasingly
+complex way the deeper the network is. Changes in early layers therefore modify
+the output in a way that becomes harder and harder to predict.
+
+\subsection{Residual Connections}
+
+Residual connections, also called skip connections, fix this by changing what
+each block computes. Instead of replacing its input, each block adds a
+correction to it: the input of the block is added to the block's output.
+\begin{equation}
+  \begin{aligned}
+    \mathbf{h}_1 &= \mathbf{x} + \mathbf{f}_1[\mathbf{x}, \boldsymbol{\phi}_1], &
+    \mathbf{h}_2 &= \mathbf{h}_1 + \mathbf{f}_2[\mathbf{h}_1, \boldsymbol{\phi}_2], \\
+    \mathbf{h}_3 &= \mathbf{h}_2 + \mathbf{f}_3[\mathbf{h}_2, \boldsymbol{\phi}_3], &
+    \mathbf{y} &= \mathbf{h}_3 + \mathbf{f}_4[\mathbf{h}_3, \boldsymbol{\phi}_4].
+  \end{aligned}
+  \label{eq:residual}
+\end{equation}
+\noindent
+The block $\mathbf{f}_k$ now only has to learn the \emph{residual}, the
+difference between the desired output and the input. A block that should do
+nothing only needs weights close to zero, which is easy to reach, whereas a
+plain block would have to learn the identity map exactly. Input and output of a
+residual block must have the same size so that they can be added.
+Figure~\ref{fig:residual-chain} shows the resulting network.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      blk/.style={draw, rounded corners, fill=blue!8, minimum width=0.9cm,
+        minimum height=0.7cm},
+      add/.style={draw, circle, inner sep=0pt, minimum size=0.42cm},
+      arrow/.style={-{Latex[length=2mm]}, thick}
+    ]
+    \node (x) at (0,0) {$\mathbf{x}$};
+    \foreach \i in {1,...,4} {
+      \node[blk] (f\i) at ({2.6*\i-1.0},0) {$\mathbf{f}_\i$};
+      \node[add] (p\i) at ({2.6*\i+0.1},0) {$+$};
+      \draw[arrow] (f\i) -- (p\i);
+      \coordinate (s\i) at ({2.6*\i-1.95},0);
+      \draw[arrow] (s\i) -- ++(0,0.8) -| (p\i.north);
+      \fill (s\i) circle (1.5pt);
+    }
+    \node (y) at (11.5,0) {$\mathbf{y}$};
+    \draw[arrow] (x) -- (f1);
+    \draw[arrow] (p1) -- (f2);
+    \draw[arrow] (p2) -- (f3);
+    \draw[arrow] (p3) -- (f4);
+    \draw[arrow] (p4) -- (y);
+    \node[below=0.2cm, font=\small] at ($(p1)!0.5!(f2)$) {$\mathbf{h}_1$};
+    \node[below=0.2cm, font=\small] at ($(p2)!0.5!(f3)$) {$\mathbf{h}_2$};
+    \node[below=0.2cm, font=\small] at ($(p3)!0.5!(f4)$) {$\mathbf{h}_3$};
+    \node[above=0.85cm, font=\small] at ($(s1)!0.5!(p1)$) {identity};
+  \end{tikzpicture}
+  \caption{A residual network with four blocks. Each skip connection carries the
+  block input unchanged around the block and adds it to the block output, so
+  every block computes a correction to its input.}
+  \label{fig:residual-chain}
+\end{figure}
+
+\paragraph{A residual network is a sum of many paths.}
+Substituting the equations~\eqref{eq:residual} into each other unravels the
+network:
+\begin{equation}
+  \begin{aligned}
+  \mathbf{y} = \mathbf{x}
+    &+ \mathbf{f}_1[\mathbf{x}]
+     + \mathbf{f}_2\bigl[\mathbf{x} + \mathbf{f}_1[\mathbf{x}]\bigr]
+     + \mathbf{f}_3\Bigl[\mathbf{x} + \mathbf{f}_1[\mathbf{x}]
+       + \mathbf{f}_2\bigl[\mathbf{x} + \mathbf{f}_1[\mathbf{x}]\bigr]\Bigr] \\
+    &+ \mathbf{f}_4\Bigl[\mathbf{x} + \mathbf{f}_1[\mathbf{x}]
+       + \mathbf{f}_2\bigl[\mathbf{x} + \mathbf{f}_1[\mathbf{x}]\bigr]
+       + \mathbf{f}_3\bigl[\ldots\bigr]\Bigr] .
+  \end{aligned}
+\end{equation}
+\noindent
+The output is the input plus the contributions of networks of every depth from
+one to four. Each block can be passed through or skipped, so $K$ blocks give
+$2^K$ paths from input to output: for $K = 4$, one path of length $0$ (the pure
+identity), four of length $1$, six of length $2$, four of length $3$, and one of
+length $4$. A residual network behaves like an ensemble of shallower networks,
+and most of its paths are much shorter than the full depth.
+
+\paragraph{Gradients through the skip connection.}
+The same structure appears in the backward pass. The Jacobian of one residual
+block is
+\begin{equation}
+  \frac{\partial \mathbf{h}_k}{\partial \mathbf{h}_{k-1}}
+  = \mathbf{I} + \frac{\partial \mathbf{f}_k}{\partial \mathbf{h}_{k-1}} ,
+\end{equation}
+so the derivative of the output with respect to the input is the product
+$\prod_k \bigl(\mathbf{I} + \partial \mathbf{f}_k/\partial \mathbf{h}_{k-1}\bigr)$.
+Multiplying it out gives again $2^K$ terms, one per path, and the first term is
+the identity. Unlike Eq.~\eqref{eq:plain-chain}, the gradient is no longer a
+single long product: the short paths contribute terms with few factors, which
+change slowly and predictably when the early layers change. In the language of
+computational graphs, the skip connection ends in an addition node, and an
+addition node distributes the upstream gradient unchanged to both of its inputs
+(Table~\ref{tab:gate-rules}). It does not send its inputs backward. The gradient
+of the loss therefore reaches every block directly through the chain of skip
+connections, however deep the network is.
+
+\paragraph{Order of operations inside a block.}
+Where the nonlinearity sits in a residual block matters:
+\begin{itemize}
+  \item If a block ends with ReLU, as in linear layer followed by ReLU, then
+        $\mathbf{f}_k \ge 0$ and each block can only \emph{increase} the values
+        of its input. The ReLU is therefore placed at the beginning of the
+        block: ReLU, then linear layer.
+  \item If every block starts with ReLU, a block does nothing for negative
+        inputs. The network therefore begins with a plain linear transformation
+        before the first residual block, so that the signal entering the
+        residual chain is a learned mixture rather than the raw input.
+  \item A block usually contains several layers, for example ReLU, linear,
+        ReLU, linear, before the skip connection adds the input back.
+\end{itemize}
+
+\begin{table}[!ht]
+  \centering
+  \begin{tabular}{@{}lccccl@{}}
+    \toprule
+    Variant & $\mathbf{x}$ & $\mathbf{h}_1$ & $\mathbf{h}_2$ & $\mathbf{h}_3$ &
+      after $K$ blocks \\
+    \midrule
+    plain residual blocks & $1$ & $2$ & $4$ & $8$ & $2^K$ \\
+    output scaled by $1/\sqrt{2}$ & $1$ & $1$ & $1$ & $1$ & $1$ \\
+    batch normalization at block start & $1$ & $2$ & $3$ & $4$ & $K+1$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Variance of the signal after each residual block when input and
+  block output both have unit variance. Plain addition doubles the variance per
+  block; scaling by $1/\sqrt{2}$ keeps it constant; batch normalization inside
+  the residual branch lets it grow only linearly.}
+  \label{tab:resnet-variance}
+\end{table}
+
+\paragraph{Variance in residual networks.}
+Residual connections solve the shattered gradients, but they create a new
+problem for the forward pass. Suppose the input of a block has variance $1$ and
+He initialization makes the block output $\mathbf{f}_k$ also have variance $1$.
+If the two are uncorrelated, their sum has variance $1 + 1 = 2$, so the variance
+\emph{doubles} with every block (Table~\ref{tab:resnet-variance}), and the
+network again suffers from unstable forward propagation and exploding
+gradients. One remedy combines He initialization with a multiplication of each
+block's combined output by $1/\sqrt{2}$, which divides the variance by two and
+restores it to $1$. More common is batch normalization, discussed next. With
+these measures, residual connections roughly double the depth that can be
+trained before performance degrades; together with normalization, networks with
+hundreds of layers become routine.
+
+\subsection{Batch Normalization}
+
+Batch normalization (BatchNorm, BN) attacks the variance problem directly.
+Instead of hoping that the initialization keeps activations in a good range, it
+measures their statistics during training and rescales them. For every hidden
+unit, the activations are standardized across the training examples of the
+current mini-batch $\mathcal{B}$. First the empirical mean and standard
+deviation of the unit's activation $h$ over the batch are computed,
+\begin{equation}
+  m_h = \frac{1}{|\mathcal{B}|} \sum_{i \in \mathcal{B}} h_i , \qquad
+  s_h = \sqrt{\frac{1}{|\mathcal{B}|} \sum_{i \in \mathcal{B}} (h_i - m_h)^2} ,
+\end{equation}
+then each activation is standardized to mean $0$ and variance $1$,
+\begin{equation}
+  h_i \leftarrow \frac{h_i - m_h}{s_h + \epsilon}
+  \qquad \forall i \in \mathcal{B} ,
+\end{equation}
+where the small constant $\epsilon$ prevents division by zero. Finally a learned
+scale $\gamma$ and offset $\delta$ give the network back the freedom to choose
+the mean and standard deviation itself:
+\begin{equation}
+  h_i \leftarrow \gamma h_i + \delta \qquad \forall i \in \mathcal{B} .
+  \label{eq:bn-affine}
+\end{equation}
+\noindent
+The same layer is often written as
+$\hat{x} = (x - \mu_\mathcal{B})/\sqrt{\sigma_\mathcal{B}^2 + \epsilon}$,
+$y = \gamma \hat{x} + \beta$, with batch mean $\mu_\mathcal{B}$, batch variance
+$\sigma_\mathcal{B}^2$, and offset $\beta$ instead of $\delta$; the two forms
+differ only in where $\epsilon$ enters. Without $\gamma$ and $\delta$, the layer
+would force every unit to zero mean and unit variance forever. With them, the
+network can learn any scale, but the scale is now an explicit parameter of the
+layer instead of an accident of the weights of all preceding layers.
+
+\paragraph{Where the statistics are computed.}
+Batch normalization is applied independently to each hidden unit, and each unit
+gets its own $\gamma$ and $\delta$. A fully connected network with $K$ layers of
+$D$ hidden units therefore learns $KD$ offsets and $KD$ scales. In a
+convolutional network, the statistics are computed not only across the batch but
+also across all spatial positions of a channel, in keeping with weight sharing:
+every position of a feature map is treated in the same way. A convolutional
+network with $K$ layers of $C$ channels thus learns $KC$ offsets and $KC$
+scales. For example, a layer with $64$ channels, a batch of $32$ images, and
+$56\times56$ feature maps computes each of its $64$ means over
+$32\cdot56\cdot56 = 100{,}352$ values and adds $128$ learned parameters.
+
+\paragraph{Training mode and evaluation mode.}
+At test time there may be only a single image, and the prediction for one image
+should not depend on which other images happen to be in the same batch. Batch
+normalization therefore behaves differently in the two phases. During training
+it uses the statistics of the current batch and additionally keeps running
+averages of the means and variances. During evaluation it uses these stored
+averages as fixed constants, so the layer becomes a fixed affine map. Forgetting
+to switch a model into evaluation mode for validation and testing is a classic
+error: the outputs then depend on the batch composition.
+
+\paragraph{Invariance to the scale of the weights.}
+If all weights and biases that feed a batch-normalized unit are multiplied by
+some $\alpha > 0$, the mean and standard deviation over the batch are multiplied
+by $\alpha$ as well, and the standardized value does not change. Batch
+normalization thus makes the network invariant to rescaling weights and biases,
+because it compensates for it. This removes exactly the sensitivity to scale
+that made initialization so critical.
+
+\paragraph{Other normalizations.}
+Batch normalization depends on the batch, which is a disadvantage for small
+batches and for sequence models. Other normalizations use the same
+standardize-then-scale recipe but compute the statistics over different axes of
+the activation tensor with batch size $N$, channels $C$, and spatial size
+$H\times W$ (Table~\ref{tab:norm-variants}). Layer normalization, instance
+normalization, and group normalization compute their statistics within a single
+example and therefore behave identically in training and evaluation.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.8cm}p{5.6cm}p{5.6cm}@{}}
+    \toprule
+    Method & Statistics computed over & One mean per \\
+    \midrule
+    Batch norm & $N$, $H$, $W$ & channel (shared by all examples) \\
+    Layer norm & $C$, $H$, $W$ & example \\
+    Instance norm & $H$, $W$ & example and channel \\
+    Group norm & $H$, $W$, and a group of channels & example and channel group \\
+    \bottomrule
+  \end{tabular}
+  \caption{Normalization layers differ only in the axes of the $N\times C\times
+  H\times W$ activation tensor over which mean and variance are computed. Only
+  batch normalization mixes different examples.}
+  \label{tab:norm-variants}
+\end{table}
+
+\paragraph{Costs and benefits.}
+Batch normalization has three main effects:
+\begin{itemize}
+  \item \emph{Stable forward propagation.} With the initialization
+        $\gamma = 1$, $\delta = 0$, every normalized activation has unit
+        variance. In a network without residual connections this keeps the
+        variance constant through all layers. In a residual network with batch
+        normalization at the start of each residual branch, each block adds
+        variance $1$ to the signal, so the variance grows as $1, 2, 3, 4, \ldots$
+        (Table~\ref{tab:resnet-variance}). Later blocks then contribute a
+        smaller share to the sum, and the network is effectively less deep at
+        the start of training. As training proceeds, $\gamma$ can grow; the
+        network thereby controls its own effective depth.
+  \item \emph{Higher learning rates.} Batch normalization makes the loss
+        surface and its gradients change more smoothly, which allows larger
+        learning rates and faster training.
+  \item \emph{Regularization.} The normalization depends on the other examples
+        in the batch, so every activation receives a small amount of random
+        noise during training. Such noise can improve generalization, similar
+        to dropout.
+\end{itemize}
+\noindent
+The costs are the dependence on the batch: small batches give noisy
+statistics, and training and evaluation behave differently.
+
+\subsection{Common Residual Architectures}
+
+Residual connections, He initialization, and batch normalization are the building
+blocks of nearly all deep image networks. Four architectures show how they are
+combined: ResNet for classification, DenseNet as a variant with concatenation,
+U-Net for segmentation, and stacked hourglass networks for pose estimation.
+
+\paragraph{ResNet blocks.}
+The standard ResNet block for images applies batch normalization, then ReLU,
+then a $3\times3$ convolution, and repeats this sequence once before the skip
+connection adds the input. This follows the order of operations above:
+normalization and nonlinearity come first, and the block ends with a linear
+operation. Deep ResNets use the \emph{bottleneck block} instead
+(Figure~\ref{fig:bottleneck}). A $1\times1$ convolution first reduces the number
+of channels by a factor of four, the expensive $3\times3$ convolution then works
+on the reduced representation, and a second $1\times1$ convolution increases the
+number of channels again so that the input can be added.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      blk/.style={draw, rounded corners, fill=blue!8, align=center,
+        minimum height=0.95cm, minimum width=2.4cm, font=\small},
+      add/.style={draw, circle, inner sep=0pt, minimum size=0.42cm},
+      arrow/.style={-{Latex[length=2mm]}, thick}
+    ]
+    \node[blk] (b1) at (1.9,0) {BN, ReLU,\\conv $1\times1$};
+    \node[blk] (b2) at (5.3,0) {BN, ReLU,\\conv $3\times3$};
+    \node[blk] (b3) at (8.7,0) {BN, ReLU,\\conv $1\times1$};
+    \node[add] (p) at (11.0,0) {$+$};
+    \coordinate (in) at (0,0);
+    \coordinate (s) at (0.35,0);
+    \draw[arrow] (in) -- (b1);
+    \draw[arrow] (b1) -- (b2);
+    \draw[arrow] (b2) -- (b3);
+    \draw[arrow] (b3) -- (p);
+    \draw[arrow] (p) -- (12.0,0);
+    \draw[arrow] (s) -- ++(0,1.0) -| (p.north);
+    \fill (s) circle (1.5pt);
+    \node[below=0.15cm, font=\small] at (0.35,0) {$256$};
+    \node[below=0.15cm, font=\small] at ($(b1.east)!0.5!(b2.west)$) {$64$};
+    \node[below=0.15cm, font=\small] at ($(b2.east)!0.5!(b3.west)$) {$64$};
+    \node[below=0.15cm, font=\small] at ($(b3.east)!0.5!(p.west)$) {$256$};
+    \node[below=0.55cm of b1, font=\small] {reduce channels};
+    \node[below=0.55cm of b3, font=\small] {increase channels};
+  \end{tikzpicture}
+  \caption{Bottleneck ResNet block. Numbers below the arrows are channel
+  counts. The two $1\times1$ convolutions reduce the channels by a factor of
+  four and restore them, so the $3\times3$ convolution runs on only $64$
+  channels.}
+  \label{fig:bottleneck}
+\end{figure}
+
+\noindent
+The saving is large. With $256$ input and output channels and ignoring biases, a
+standard block with two $3\times3$ convolutions needs
+$2 \cdot 9 \cdot 256^2 \approx 1.18$ million weights. The bottleneck block needs
+$256\cdot64 + 9\cdot64^2 + 64\cdot256 = 16{,}384 + 36{,}864 + 16{,}384
+= 69{,}632$ weights, about seventeen times fewer, and it contains three
+nonlinear layers instead of two.
+
+\paragraph{ResNet-200.}
+The ResNet-200 network for ImageNet starts with a $7\times7$ convolution with
+stride $2$ and a max pooling step, reducing the $224\times224\times3$ image to
+$56\times56$ with $64$ channels. Four stages of bottleneck blocks follow, with
+$56\times56\times256$, $28\times28\times512$, $14\times14\times1024$, and
+$7\times7\times2048$ outputs; inside the blocks the channels are reduced to $64$,
+$128$, $256$, and $512$. Between the stages the resolution is halved, and the
+skip connection uses a strided $1\times1$ convolution so that input and output
+shapes match again. The two middle stages contain $24$ and $36$ blocks; with
+three blocks each in the first and last stage this gives $66$ blocks of three
+convolutions, plus the first convolution and the final layer, $200$ layers in
+total. Global average pooling, a fully connected layer, and a softmax over the
+$1000$ classes produce the output. ResNet-200 reached a top-5 error of $4.8\%$ on
+ImageNet, the first network to exceed human performance on this benchmark, and
+continued the trend of Table~\ref{tab:alexnet-vgg} from $16.4\%$ (AlexNet)
+and $6.8\%$ (VGG).
+
+\paragraph{DenseNet.}
+Instead of adding the input activations to the output, they can also be
+\emph{concatenated} with it. In a DenseNet, the input of every layer consists of
+the concatenated outputs of \emph{all} previous layers. Early layers then
+contribute directly to the output, which, as with residual connections, makes
+the loss surface behave reasonably. Concatenation lets the number of channels
+grow with every layer, so a $1\times1$ convolution reduces it from time to
+time. Concatenation across a downsampling step is impossible, because the
+representations have different spatial sizes. The chain of concatenations is
+therefore broken at each downsampling step, and the smaller representation
+starts a new chain. With the same number of parameters, DenseNet can perform
+better than ResNet.
+
+\paragraph{U-Net.}
+The encoder--decoder networks for semantic segmentation in Section~\ref{sec:cnn}
+must squeeze the whole image through a low-resolution bottleneck. The decoder
+then has to recover the exact position of every boundary from coarse features,
+as if it had to ``remember'' the high-resolution detail. The U-Net adds skip
+connections from each encoder level to the decoder level of the same
+resolution (Figure~\ref{fig:unet}). The decoder receives the fine details
+directly and only has to combine them with the semantic information from the
+bottleneck. The U-Net uses valid $3\times3$ convolutions, so the encoder feature
+maps are slightly larger than the corresponding decoder maps; they are
+\emph{cropped} to the same size and then \emph{concatenated}, not added.
+Upsampling uses transposed $2\times2$ convolutions, and a final $1\times1$
+convolution produces one score per class and pixel. The input of
+$572\times572$ pixels therefore gives a label map of $388\times388$ pixels.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+      box/.style={draw, fill=blue!10, minimum width=0.35cm},
+      arrow/.style={-{Latex[length=2mm]}, thick},
+      skip/.style={-{Latex[length=2mm]}, thick, orange!80!black}
+    ]
+    \node[box, minimum height=0.9cm] (e1) at (0,0) {};
+    \node[box, minimum height=0.75cm] (e2) at (1.2,-1) {};
+    \node[box, minimum height=0.6cm] (e3) at (2.4,-2) {};
+    \node[box, minimum height=0.45cm] (e4) at (3.6,-3) {};
+    \node[box, fill=orange!25, minimum height=0.3cm] (b) at (4.8,-4) {};
+    \node[box, minimum height=0.45cm] (d4) at (6.0,-3) {};
+    \node[box, minimum height=0.6cm] (d3) at (7.2,-2) {};
+    \node[box, minimum height=0.75cm] (d2) at (8.4,-1) {};
+    \node[box, minimum height=0.9cm] (d1) at (9.6,0) {};
+    \foreach \a/\b in {e1/e2, e2/e3, e3/e4, e4/b} {
+      \draw[arrow] (\a.south) -- (\b.north west);
+    }
+    \foreach \a/\b in {b/d4, d4/d3, d3/d2, d2/d1} {
+      \draw[arrow] (\a.north east) -- (\b.south);
+    }
+    \foreach \i in {1,...,4} {
+      \draw[skip] (e\i.east) -- (d\i.west);
+    }
+    \node[above=0.05cm, font=\small] at ($(e1.east)!0.5!(d1.west)$)
+      {crop and concatenate};
+    \node[left=0.1cm of e1, font=\small] {$568^2\times64$};
+    \node[left=0.1cm of e2, font=\small] {$280^2\times128$};
+    \node[left=0.1cm of e3, font=\small] {$136^2\times256$};
+    \node[left=0.1cm of e4, font=\small] {$64^2\times512$};
+    \node[below=0.1cm of b, font=\small] {$28^2\times1024$};
+    \node[right=0.1cm of d4, font=\small] {$52^2\times512$};
+    \node[right=0.1cm of d3, font=\small] {$100^2\times256$};
+    \node[right=0.1cm of d2, font=\small] {$196^2\times128$};
+    \node[right=0.1cm of d1, font=\small] {$388^2\times64$};
+  \end{tikzpicture}
+  \caption{U-Net. The encoder (left) halves the resolution with max pooling, the
+  decoder (right) doubles it with transposed convolutions. Horizontal skip
+  connections copy each encoder map, crop it, and concatenate it with the
+  decoder map of the same level. Labels give spatial size and channels.}
+  \label{fig:unet}
+\end{figure}
+
+\noindent
+The U-Net was designed for segmenting medical images. A typical example is the
+classification of voxels in three-dimensional volumes of mouse cortex recorded
+with a scanning electron microscope, where a single U-Net already gives a good
+labeling and an ensemble of five U-Nets a better one. Because its output has the
+size of its input and preserves fine detail, the U-Net is also the standard
+backbone for other image-to-image tasks, including the denoising networks of
+diffusion models.
+
+\paragraph{Stacked hourglass networks.}
+A stacked hourglass network repeats several U-Net-like encoder--decoder blocks
+one after the other. Each block alternates between looking at the image at a
+local and at a global level, and the next block refines the result of the
+previous one. Inside the blocks, skip connections \emph{add} the results rather
+than concatenating them. The network was developed for human pose estimation.
+It produces one \emph{heatmap} per body joint, whose value at each pixel
+indicates how likely the joint is to lie there, and the estimated joint position
+is the maximum of its heatmap. Training compares the predicted heatmaps with
+target heatmaps, so pose estimation is formulated as a \emph{regression}
+problem, in contrast to the classification problems considered so far.
+
+\paragraph{Why residual networks work so well.}
+Visualizations of the loss as a function of the parameters make the difference
+visible. For a deep plain network, the loss surface is rugged and full of
+local structure, matching the shattered gradients. With residual connections,
+the loss surface around the solution is much smoother and nearly convex, so
+gradient descent with a finite step size makes steady progress.
+Table~\ref{tab:residual-archs} summarizes the four architectures.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.8cm}p{3.0cm}p{2.8cm}p{6.0cm}@{}}
+    \toprule
+    Architecture & Skip operation & Typical task & Key idea \\
+    \midrule
+    ResNet & addition & classification & bottleneck blocks with BN and ReLU;
+      hundreds of layers \\
+    DenseNet & concatenation & classification & every layer sees all previous
+      outputs; $1\times1$ convolutions limit channels \\
+    U-Net & crop and concatenate & segmentation & skips from encoder to decoder
+      preserve high-resolution detail \\
+    Stacked hourglass & addition & pose estimation & repeated U-Net-like blocks;
+      one heatmap per joint (regression) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Four common residual architectures. They differ in how the skip
+  connection combines its signals and in the task the network is built for.}
+  \label{tab:residual-archs}
+\end{table}

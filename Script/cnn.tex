@@ -667,7 +667,7 @@ largest variant has $19$ weight layers and $144$ million parameters and reached
 a top-5 error of $6.8\%$ and a top-1 error of $23.7\%$.
 Table~\ref{tab:alexnet-vgg} compares the two networks. Over the following years
 the ImageNet error kept falling as networks grew deeper, until residual
-networks made training of very deep networks routine and
+networks (Section~\ref{sec:resnet}) made training of very deep networks routine and
 surpassed human-level top-5 performance.
 
 \begin{table}[ht]
@@ -773,8 +773,8 @@ convolutions, recovering \emph{where} each class lies at full resolution. The
 final layer is a $1\times1$ convolution with one channel per class and a softmax
 at every pixel, and the loss is the sum of the per-pixel cross-entropies.
 Because every layer is convolutional, the whole network is equivariant, and the
-per-pixel classifier shares its weights across the image. The U-Nets of later
-sections improve this design by adding skip connections that pass fine details
+per-pixel classifier shares its weights across the image. The U-Net of
+Section~\ref{sec:resnet} improves this design by adding skip connections that pass fine details
 from the encoder directly to the decoder.
 
 \begin{figure}[ht]
