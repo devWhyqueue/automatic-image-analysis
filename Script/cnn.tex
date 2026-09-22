@@ -19,7 +19,7 @@ much the convolutional structure helps. The section closes with the three
 standard tasks, image classification, object detection, and semantic
 segmentation, and the architectures that solve them.
 
-\subsection{Why Fully Connected Networks Fail on Images}
+\subsection{Why Images Need Convolution}
 
 Three problems appear as soon as a fully connected network is applied to a raw
 image.
@@ -53,8 +53,6 @@ Convolutional networks answer all three problems with two design decisions.
 \noindent
 The number of parameters then depends only on the patch size, not on the image
 size, and the network processes every location in the same way.
-
-\subsection{Invariance and Equivariance}
 
 What does ``processes every location in the same way'' mean precisely? Two
 notions describe how the output of a function $f$ reacts when its input $x$ is
@@ -103,14 +101,11 @@ throw away position, such as pooling and a final global aggregation. A typical
 classification network is therefore equivariant in its early layers and
 increasingly invariant toward its output.
 
-\subsection{Convolution in One Dimension}
+\subsection{The Convolutional Layer}
 
 The convolutional layer is easiest to understand on a one-dimensional signal,
 for example one row of an image or a sampled time series. Every idea carries
-over to two dimensions unchanged.
-
-\paragraph{The operation.}
-Let the input be a vector $x = (x_1,\dots,x_D)$. Each output $z_i$ is a weighted
+over to two dimensions unchanged. Let the input be a vector $x = (x_1,\dots,x_D)$. Each output $z_i$ is a weighted
 sum of $x_i$ and its immediate neighbors. With a \emph{kernel} (or \emph{filter})
 $\omega = (\omega_1,\omega_2,\omega_3)^\top$ of size three,
 \begin{equation}
@@ -128,8 +123,7 @@ as $\omega = (-1,0,1)$ computes a central difference, the same derivative filter
 used for edge detection (Appendix~\ref{app:edges}); a convolutional network
 learns kernels like this from data instead of having them designed by hand.
 
-\paragraph{Borders: zero padding or valid convolution.}
-At the first and last position, Eq.~\eqref{eq:conv1d} needs inputs $x_0$ and
+At the borders the operation needs a convention: at the first and last position, Eq.~\eqref{eq:conv1d} needs inputs $x_0$ and
 $x_{D+1}$ that do not exist. Two conventions handle this. \emph{Zero padding}
 treats positions beyond the end of the input as zero, so the output has the
 same length as the input. A \emph{valid} convolution only computes outputs where
@@ -216,10 +210,8 @@ $\lfloor\tfrac{224-7+6}{2}\rfloor+1 = 111+1 = 112$, roughly halving the image.
 With $P = 0$, Eq.~\eqref{eq:conv-outsize} reduces to the valid size
 $W-K+1$ for $S=1$.
 
-\subsection{The Convolutional Layer}
-
-A convolutional layer turns the convolution into a network layer in the same way
-as in Section~\ref{sec:neural-networks}: add a bias $\beta$ and pass the result
+So far the operation is purely linear. A convolutional layer turns it into a
+network layer in the same way as in Section~\ref{sec:neural-networks}: add a bias $\beta$ and pass the result
 through an activation function $a[\cdot]$, usually ReLU:
 \begin{equation}
   h_i = a\Bigl[\beta + \omega_1 x_{i-1} + \omega_2 x_i + \omega_3 x_{i+1}\Bigr]
@@ -229,8 +221,7 @@ through an activation function $a[\cdot]$, usually ReLU:
 In the worked example with $\beta = 0$, ReLU turns $z = (1,-2,2,1,-3)$ into
 $h = (1,0,2,1,0)$.
 
-\paragraph{A special case of a fully connected layer.}
-A fully connected layer computes $h = a[\beta + \Omega x]$ with a full weight
+This layer is nothing new in principle. A fully connected layer computes $h = a[\beta + \Omega x]$ with a full weight
 matrix $\Omega\in\mathbb{R}^{D\times D}$ and a bias per output: $D^2$ weights
 and $D$ biases. A convolutional layer computes exactly the same expression, but
 with a very special $\Omega$. Most entries are zero, because each output only
@@ -329,7 +320,12 @@ $x_3$ only, because its left tap would need $x_{-1}$; the missing tap is the
 signature of zero padding, and the gap of one position between taps is the
 signature of dilation $2$.
 
-\subsection{Channels and Parameter Counts}
+\subsection{Channels, Receptive Fields, and Why Convolution Helps}
+
+One kernel per layer is not enough, and one layer is not enough either. The
+layer is first widened with channels, then the network is deepened until its
+units see large parts of the input, and finally the complete design is tested
+against a fully connected network.
 
 A single convolution followed by ReLU averages its inputs and then discards all
 negative responses, so one such output necessarily loses information about the
@@ -357,7 +353,6 @@ Every output position therefore sees a small neighborhood of the input in
 tensor of size $H\times W\times C$ is mapped to an output of size
 $H\times W\times C_o$ (with same padding), one feature map per kernel.
 
-\paragraph{Counting parameters.}
 The parameter counts follow directly from the tensor shapes
 (Table~\ref{tab:conv-params}). One output channel of a one-dimensional layer
 needs $C_i K$ weights and one bias; $C_o$ output channels need $C_i C_o K$
@@ -392,9 +387,8 @@ $224\times224\times64$ output would need about $150{,}528\cdot3.2\cdot10^6
 \approx 4.8\cdot10^{11}$ weights. The difference of more than eight orders of
 magnitude is the whole point of convolution.
 
-\subsection{Receptive Fields}
-
-A hidden unit in the first layer sees $K$ inputs. A unit in the second layer sees
+Channels widen what a layer computes at one position; depth widens how much of
+the input a unit sees. A hidden unit in the first layer sees $K$ inputs. A unit in the second layer sees
 $K$ units of the first layer, each of which sees $K$ inputs, so the region of
 the input that can influence it has grown. The \emph{receptive field} of a unit is
 this region: the set of input positions that can change its value.
@@ -459,7 +453,63 @@ field as one $5\times5$ layer, but need $2\cdot9\,C^2 = 18C^2$ instead of $25C^2
 weights for $C$ channels, and they add a second nonlinearity. This is the design
 principle of the VGG network discussed below.
 
-\subsection{Two-Dimensional Convolution, Downsampling, and Upsampling}
+\paragraph{Putting it together: MNIST-1D.}
+How much does the convolutional structure actually help? MNIST-1D is a small
+benchmark built for this question. Each of ten digit templates is a
+one-dimensional curve; a training example is a randomly transformed template
+with added noise, sampled at $40$ positions. The class does not depend on where
+along the signal the pattern appears, which is exactly the kind of structure a
+convolutional network is designed for.
+
+The convolutional network for this task has three convolutional layers and one fully connected layer,
+followed by softmax. All convolutions are valid, with kernel size $3$, stride
+$2$, and $15$ channels. The output sizes follow from
+Eq.~\eqref{eq:conv-outsize}, and the parameter counts from
+Table~\ref{tab:conv-params}:
+\begin{center}
+  \begin{tabular}{@{}lccr@{}}
+    \toprule
+    Layer & Output size & Computation & Parameters \\
+    \midrule
+    input & $40\times1$ & & \\
+    conv 1 ($1\rightarrow15$) & $19\times15$ &
+      $\lfloor 37/2\rfloor+1 = 19$ & $1\cdot15\cdot3+15 = 60$ \\
+    conv 2 ($15\rightarrow15$) & $9\times15$ &
+      $\lfloor 16/2\rfloor+1 = 9$ & $15\cdot15\cdot3+15 = 690$ \\
+    conv 3 ($15\rightarrow15$) & $4\times15$ &
+      $\lfloor 6/2\rfloor+1 = 4$ & $690$ \\
+    fully connected ($60\rightarrow10$) & $10$ & $4\cdot15 = 60$ inputs &
+      $60\cdot10+10 = 610$ \\
+    \midrule
+    total & & & $2{,}050$ \\
+    \bottomrule
+  \end{tabular}
+\end{center}
+\noindent
+By Eq.~\eqref{eq:receptive-field}, the units of the three convolutional layers
+have receptive fields of $3$, $7$, and $15$ input samples; the fully connected
+layer then combines all of them. The network is trained with SGD for $100{,}000$
+steps with learning rate $0.01$ and batch size $100$.
+
+For comparison, a fully connected network with exactly the same number of layers and hidden
+units has $150{,}185$ parameters, more than seventy times as many. Its training
+error drops to zero within a small fraction of the training steps, but its test
+error stays at roughly $40\%$. The convolutional network fits the training data
+more slowly and still reaches a test error of only about $17\%$. The fully
+connected network overfits (Section~\ref{sec:neural-networks}): it has enough
+freedom to memorize the training set and nothing that guides it toward rules
+that transfer to new examples.
+
+The reason is the \emph{inductive bias} of convolution, the prior assumption
+built into the architecture. The convolutional network is forced to process
+every position in the same way, so what it learns from a pattern at one position
+is immediately available at all other positions: information is shared across
+locations. It searches through a much smaller family of input--output mappings,
+and all members of that family are plausible for signals in which position does
+not matter. A fully connected network could in principle represent the same
+function, but it would have to discover weight sharing from data alone.
+
+\subsection{Convolutional Networks for Image Classification}
 
 Images are two-dimensional, and the convolutional layer extends to them without
 new ideas. The kernel becomes a $K\times K$ grid of weights, and each output is a
@@ -510,7 +560,6 @@ In the backward pass, max pooling behaves like the maximum node of
 Table~\ref{tab:gate-rules}: the gradient is routed only to the position that
 held the maximum. Mean pooling distributes it equally over the block.
 
-\paragraph{Upsampling.}
 Networks that must output an image-sized result, such as a segmentation, need the
 reverse operation. The simplest is to \emph{duplicate} every value into a
 $2\times2$ block. \emph{Max-upsampling} (max-unpooling) remembers where each
@@ -520,8 +569,7 @@ new positions with weighted averages of their neighbors. A learned alternative i
 the transposed convolution, which spreads each input value over a neighborhood
 with learned weights.
 
-\paragraph{$1\times1$ convolution.}
-A kernel of spatial size $1\times1$ looks at a single position but at all $C_i$
+A last special case is the $1\times1$ convolution. A kernel of spatial size $1\times1$ looks at a single position but at all $C_i$
 channels. It computes, at every pixel independently, a weighted combination of
 the channels. This is equivalent to running the same small fully connected
 network at every position. It mixes information between channels and changes
@@ -529,69 +577,9 @@ their number, from $C_i$ to $C_o$, at the cost of only $C_i C_o + C_o$
 parameters. It is often used to reduce the number of channels before an
 expensive $3\times3$ layer.
 
-\subsection{Why Convolution Helps: The MNIST-1D Experiment}
-
-How much does the convolutional structure actually help? MNIST-1D is a small
-benchmark built for this question. Each of ten digit templates is a
-one-dimensional curve; a training example is a randomly transformed template
-with added noise, sampled at $40$ positions. The class does not depend on where
-along the signal the pattern appears, which is exactly the kind of structure a
-convolutional network is designed for.
-
-\paragraph{The convolutional network.}
-The network has three convolutional layers and one fully connected layer,
-followed by softmax. All convolutions are valid, with kernel size $3$, stride
-$2$, and $15$ channels. The output sizes follow from
-Eq.~\eqref{eq:conv-outsize}, and the parameter counts from
-Table~\ref{tab:conv-params}:
-\begin{center}
-  \begin{tabular}{@{}lccr@{}}
-    \toprule
-    Layer & Output size & Computation & Parameters \\
-    \midrule
-    input & $40\times1$ & & \\
-    conv 1 ($1\rightarrow15$) & $19\times15$ &
-      $\lfloor 37/2\rfloor+1 = 19$ & $1\cdot15\cdot3+15 = 60$ \\
-    conv 2 ($15\rightarrow15$) & $9\times15$ &
-      $\lfloor 16/2\rfloor+1 = 9$ & $15\cdot15\cdot3+15 = 690$ \\
-    conv 3 ($15\rightarrow15$) & $4\times15$ &
-      $\lfloor 6/2\rfloor+1 = 4$ & $690$ \\
-    fully connected ($60\rightarrow10$) & $10$ & $4\cdot15 = 60$ inputs &
-      $60\cdot10+10 = 610$ \\
-    \midrule
-    total & & & $2{,}050$ \\
-    \bottomrule
-  \end{tabular}
-\end{center}
-\noindent
-By Eq.~\eqref{eq:receptive-field}, the units of the three convolutional layers
-have receptive fields of $3$, $7$, and $15$ input samples; the fully connected
-layer then combines all of them. The network is trained with SGD for $100{,}000$
-steps with learning rate $0.01$ and batch size $100$.
-
-\paragraph{The fully connected comparison.}
-A fully connected network with exactly the same number of layers and hidden
-units has $150{,}185$ parameters, more than seventy times as many. Its training
-error drops to zero within a small fraction of the training steps, but its test
-error stays at roughly $40\%$. The convolutional network fits the training data
-more slowly and still reaches a test error of only about $17\%$. The fully
-connected network overfits (Section~\ref{sec:neural-networks}): it has enough
-freedom to memorize the training set and nothing that guides it toward rules
-that transfer to new examples.
-
-\paragraph{Inductive bias.}
-The reason is the \emph{inductive bias} of convolution, the prior assumption
-built into the architecture. The convolutional network is forced to process
-every position in the same way, so what it learns from a pattern at one position
-is immediately available at all other positions: information is shared across
-locations. It searches through a much smaller family of input--output mappings,
-and all members of that family are plausible for signals in which position does
-not matter. A fully connected network could in principle represent the same
-function, but it would have to discover weight sharing from data alone.
-
-\subsection{Architectures for Image Classification}
-
-Image classification is a multiclass problem: the network receives an image and
+\paragraph{Image classification and the ConvNet layout.}
+With these building blocks, full image classifiers can be assembled. Image
+classification is a multiclass problem: the network receives an image and
 outputs a probability for each of more than two discrete classes. Deep networks
 won this task on the ImageNet benchmark, a database of millions of labeled
 images in $1{,}000$ classes, typically resized to $224\times224$ pixels. Results
@@ -599,7 +587,6 @@ are reported as \emph{top-1 error} (the highest-scoring class is wrong) and
 \emph{top-5 error} (the correct class is not among the five highest-scoring
 ones).
 
-\paragraph{The basic layout of a ConvNet.}
 Almost every classification network follows the layout of
 Figure~\ref{fig:convnet-layout}. A stack of blocks, each made of convolution and
 ReLU, often followed by max pooling, reduces the resolution step by step while
@@ -673,8 +660,8 @@ AlexNet reached a top-5 error of $16.4\%$ and a top-1 error of $38.1\%$.
 \paragraph{VGG (2015).}
 The VGG networks pushed depth further with a deliberately simple design: only
 $3\times3$ convolutions (stride $1$, same padding) and $2\times2$ max pooling,
-with the number of channels doubling after each pooling step. As shown in the
-subsection on receptive fields, stacks of small kernels reach large receptive
+with the number of channels doubling after each pooling step. As shown above for
+receptive fields, stacks of small kernels reach large receptive
 fields with fewer weights and more nonlinearities than one large kernel. The
 largest variant has $19$ weight layers and $144$ million parameters and reached
 a top-5 error of $6.8\%$ and a top-1 error of $23.7\%$.
