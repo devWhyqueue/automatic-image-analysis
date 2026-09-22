@@ -616,11 +616,11 @@ ConvNets because it is cheap and does not saturate for positive inputs.
     \draw[arrow] (c1) -- (c2);
     \draw[arrow] (fc) -- (sm);
     \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick]
-      ([yshift=-0.2cm]c1.south west) -- ([yshift=-0.2cm]dots.south east)
+      ([yshift=-0.2cm]c1.south west) -- ([yshift=-0.2cm]dots.east |- c1.south)
       node[midway, below=0.25cm, font=\small, align=center]
       {feature extraction: resolution $\downarrow$, channels $\uparrow$};
     \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick]
-      ([yshift=-0.2cm]fc.south west) -- ([yshift=-0.2cm]sm.south east)
+      ([yshift=-0.2cm]fc.west |- c1.south) -- ([yshift=-0.2cm]sm.east |- c1.south)
       node[midway, below=0.25cm, font=\small] {classifier};
   \end{tikzpicture}
   \caption{Basic layout of a convolutional network for classification.
