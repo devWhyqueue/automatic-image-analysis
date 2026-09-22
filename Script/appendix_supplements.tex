@@ -280,3 +280,186 @@ position and scale of a HOG feature pyramid, and the high-scoring windows,
 after non-maxima suppression, are the detections. The SVM only outputs a score
 for a given window, not a location. Objects are found by classifying windows at
 many locations, not by a codebook and Hough voting.
+
+\section{Density Models and Calibration}
+\label{app:gmm}
+
+Section~\ref{sec:bayes} estimates class-conditional densities with histograms,
+Parzen windows, and single Gaussians, and then turns them into posteriors.
+Exercises go three small steps further: they repair empty histogram bins, fit
+densities with several modes, and check whether the resulting probabilities can
+be trusted. Each step needs only a few formulas.
+
+\paragraph{Laplace correction.}
+A histogram estimated from few samples has empty bins, and an empty bin gives
+probability zero. One zero factor makes a whole naive-Bayes product zero, however
+strongly the other features speak for the class. The Laplace correction adds a
+pseudo-count $\lambda$ (usually $\lambda = 1$) to every one of the $K$ bins before
+normalizing:
+\begin{equation}
+  \hat P(\text{bin } i) = \frac{n_i + \lambda}{n + \lambda K},
+\end{equation}
+\noindent
+where $n_i$ is the count of bin $i$ and $n$ the total number of samples. The
+denominator grows by $\lambda K$ so that the corrected values still sum to one.
+For example, with $n = 12$ samples on a $3\times 3$ grid ($K = 9$) and $n_i = 2$
+samples in the queried cell, $\hat P = (2+1)/(12+9) = 1/7$; an empty cell gets
+$1/21$ instead of $0$. For a density, divide by the cell area; on unit cells
+the value is the same. Count carefully which cells the grid really has,
+including empty ones, because $K$ enters the denominator.
+
+\paragraph{Gaussian mixture models.}
+A single Gaussian cannot describe a class with several subgroups, for example
+benign lesions of different colors. A Gaussian mixture model (GMM) writes the
+density as a weighted sum of $K$ components,
+\begin{equation}
+  p(x\mid\theta) = \sum_{m=1}^{K} w_m\,\mathcal N(x;\mu_m,\Sigma_m),
+  \qquad \sum_{m=1}^K w_m = 1,\quad w_m\ge 0 .
+\end{equation}
+\noindent
+It is a parametric model, but its ML estimate has no closed form, because we do
+not know which component produced which sample. The
+\emph{expectation-maximization} (EM) algorithm alternates two steps. The E-step
+assigns every sample soft memberships, the \emph{responsibilities}
+\begin{equation}
+  r_{im} = \frac{w_m\,\mathcal N(x_i;\mu_m,\Sigma_m)}
+                {\sum_{l=1}^{K} w_l\,\mathcal N(x_i;\mu_l,\Sigma_l)} .
+\end{equation}
+\noindent
+The M-step re-estimates each component as a weighted ML fit, with
+$N_m = \sum_i r_{im}$:
+\begin{equation}
+  w_m = \frac{N_m}{n},
+  \qquad
+  \mu_m = \frac{1}{N_m}\sum_i r_{im}\,x_i,
+  \qquad
+  \Sigma_m = \frac{1}{N_m}\sum_i r_{im}(x_i-\mu_m)(x_i-\mu_m)^\top .
+\end{equation}
+\noindent
+The two steps repeat until the likelihood stops improving. The likelihood never
+decreases, but EM can end in a local maximum, so the initialization matters. On
+the five points $\{1.0,1.2,1.4,4.1,4.4\}$ with $K=2$ and starting means near $1$
+and $4$, the responsibilities become sharp after one or two iterations, the
+means move to the cluster centers $1.2$ and $4.25$, and the weights approach
+$3/5$ and $2/5$.
+
+\paragraph{Choosing $K$ with BIC.}
+More components always fit the training data at least as well, so the
+likelihood alone would choose an overfitted model. The Bayesian information
+criterion adds a penalty for the number of parameters $k$:
+\begin{equation}
+  \mathrm{BIC} = k\ln n - 2\ln\hat L ,
+\end{equation}
+\noindent
+where $\hat L$ is the maximized likelihood and $n$ the number of samples. Lower
+BIC is better. A one-dimensional GMM has $k = 3K-1$ parameters ($K$ means, $K$
+variances, $K-1$ free weights). Compare values of $K$ only on the same features
+and data split.
+
+\paragraph{Calibration.}
+A posterior is only useful for risk-based decisions if its values mean what they
+say. A classifier is \emph{calibrated} if, among all cases where it predicts
+confidence $p$, a fraction $p$ is actually positive: of $100$ cases predicted at
+$0.8$, about $80$ should be positive. Accuracy and calibration are different
+properties, and deep networks are often accurate but overconfident. A
+\emph{reliability diagram} sorts predictions into confidence bins (for example
+$15$) and plots the empirical accuracy of each bin against its mean confidence;
+the diagonal is perfect calibration, and bars below it indicate
+overconfidence. The \emph{expected calibration error} summarizes the diagram as
+the weighted mean gap,
+\begin{equation}
+  \mathrm{ECE} = \sum_{m=1}^{M}\frac{\lvert B_m\rvert}{n}\,
+  \bigl\lvert \mathrm{acc}(B_m) - \mathrm{conf}(B_m)\bigr\rvert .
+\end{equation}
+\noindent
+\emph{Temperature scaling} is the simplest fix for a network with logits $z$:
+replace the softmax by $\hat p_i = \exp(z_i/T)/\sum_j\exp(z_j/T)$ with one scalar
+$T$. A value $T>1$ makes the predictions less extreme without changing their
+ranking, so the accuracy stays the same. $T$ is fitted on validation data, never
+on the test set.
+
+\section{Graphical Models}
+\label{app:graphical}
+
+A graphical model draws the dependency structure of a joint distribution as a
+graph: nodes are random variables, and edges show which variables interact
+directly. Missing edges encode independence, and they are what makes a
+high-dimensional distribution tractable. Graphical models solve tasks such as
+denoising, segmentation, stereo, and in general inferring hidden variables from
+observed ones. The Markov random fields of Section~\ref{sec:bayes} are the
+undirected kind; exam questions also ask about the directed kind and about how
+graphs and factorizations correspond.
+
+\paragraph{Conditional independence.}
+Two variables $a$ and $b$ are conditionally independent given $c$, written
+$a\perp b\mid c$, if $p(a,b\mid c) = p(a\mid c)\,p(b\mid c)$, equivalently
+$p(a\mid b,c) = p(a\mid c)$: once $c$ is known, $b$ carries no further
+information about $a$. Naive Bayes is exactly this assumption for the features
+given the class, and the Markov property says that a pixel is conditionally
+independent of the rest of the field given its neighbors.
+
+\paragraph{Bayesian networks.}
+A Bayesian network is a \emph{directed acyclic graph} (DAG): edges have
+directions, and no directed path leads from a node back to itself. Each node
+$x_i$ has parents $\mathrm{pa}(x_i)$, the nodes with an edge pointing to it, and
+the joint distribution factorizes into one conditional per node,
+\begin{equation}
+  p(x_1,\dots,x_N) = \prod_{i=1}^{N} p\bigl(x_i\mid \mathrm{pa}(x_i)\bigr).
+\end{equation}
+\noindent
+Converting in both directions is mechanical (Figure~\ref{fig:bn-example}). From
+graph to factorization, write one factor per node, conditioned on exactly its
+parents; a node without parents gets its marginal. From factorization to graph,
+draw one node per variable and, for each factor $p(x_i\mid\cdot)$, an arrow
+from every conditioning variable to $x_i$.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[node distance=0.8cm and 1.1cm,
+      var/.style={draw, circle, minimum size=0.75cm},
+      >={Stealth}]
+    \node[var] (a) {$a$};
+    \node[var, right=of a] (b) {$b$};
+    \node[var, below right=0.8cm and 0.25cm of a] (c) {$c$};
+    \node[var, below=of c] (d) {$d$};
+    \draw[->] (a) -- (c);
+    \draw[->] (b) -- (c);
+    \draw[->] (c) -- (d);
+    \node[right=1.8cm of c, align=left]
+      {$p(a,b,c,d) = p(a)\,p(b)\,p(c\mid a,b)\,p(d\mid c)$};
+  \end{tikzpicture}
+  \caption{A Bayesian network and its factorization. Each node contributes one
+  factor conditioned on its parents; $a$ and $b$ have no parents and contribute
+  their marginals.}
+  \label{fig:bn-example}
+\end{figure}
+
+\paragraph{MRF factorization.}
+An MRF is an undirected graph, so there are no parents and no conditionals.
+Instead the joint distribution factorizes over the \emph{maximal cliques} $C$
+of the graph, the cliques that cannot be enlarged by another node:
+\begin{equation}
+  p(x) = \frac1Z\prod_{C}\psi_C(x_C),
+  \qquad
+  \psi_C(x_C) = \exp\{-E_C(x_C)\},
+  \qquad
+  Z = \sum_x\prod_C\psi_C(x_C).
+\end{equation}
+\noindent
+The potential functions $\psi_C\ge 0$ are not probabilities, which is why the
+normalizer $Z$ is needed. Writing them as exponentials of energies gives back
+the Gibbs form of Equation~\eqref{eq:gibbs}: the total energy is the sum of the
+clique energies, and potential and energy are related by $\psi = \exp(-E)$. On a
+4-connected pixel grid the maximal cliques are the horizontal and vertical pixel
+pairs, and the energies split into unary terms on single nodes and pairwise
+terms on pairs.
+
+\paragraph{MRF versus CRF.}
+An MRF for labeling is generative: it models the prior $p(x)$ of the labels and
+the likelihood $p(y\mid x)$ of the observations, and the posterior follows with
+Bayes' theorem. A \emph{conditional random field} (CRF) models the posterior
+$p(x\mid y)$ directly, as a Gibbs distribution whose potentials may depend on
+the whole observed image. A typical example is a contrast-sensitive pairwise
+term that penalizes a label change less where the image has a strong edge. A
+CRF is therefore discriminative: it never models how the image was generated,
+only which labelings are plausible given it.
