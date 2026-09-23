@@ -73,17 +73,3 @@ arithmetic, Bayes, RNN) wait for their own chapter, not appendix.
 ## Git
 
 - Never create new branches. Commit directly on the current branch.
-
-## PDFs
-
-PDFs are not password protected. The Claude PDF reader has a known parsing bug.
-
-Run:
-
-pdftotext -layout "papers/foo.pdf" "/tmp/foo.txt"
-
-Then read /tmp/foo.txt instead.
-
-If figures/pages matter:
-
-pdftoppm -png -r 150 "path/to/paper.pdf" "/tmp/paper"
