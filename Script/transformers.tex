@@ -1,0 +1,336 @@
+\section{Transformers}
+\label{sec:transformers}
+
+A convolution uses the same filter at every image location, but a single filter
+only sees a local neighborhood. In a sentence, the useful context for a word may
+be many positions away: in ``the food was delicious, but the service was slow,''
+the two adjectives refer to different nouns. A transformer lets each position
+combine information from every position. The strength of each connection is
+computed from the current input rather than fixed in advance. Its learned
+parameters are shared across positions, so the same layer can process sequences
+of different lengths.
+
+\subsection{Tokens and Embeddings}
+
+Before a network can process text, a tokenizer divides it into discrete units.
+Using complete words alone makes the vocabulary enormous and leaves new names or
+spellings without a representation. Subword tokenization instead builds a
+vocabulary of frequent character sequences. Repeatedly merging common adjacent
+pieces can turn characters into a mixture of fragments and whole words. Related
+forms such as ``walk,'' ``walked,'' and ``walking'' can then share pieces, while
+an unfamiliar word can still be assembled from smaller units.
+
+Give each of the $|\mathcal V|$ vocabulary entries an integer index. A learned
+embedding table $E\in\mathbb R^{|\mathcal V|\times d}$ maps token $t_i$ to
+$x_i=E_{t_i,:}\in\mathbb R^d$. The same table is used at every position. This
+vector is a starting representation, not a meaning fixed for all contexts: the
+token ``bank'' has the same input vector in ``river bank'' and ``bank account.''
+Attention can give those occurrences different outputs by combining them with
+their neighbors.
+
+Token order must also be supplied. Without position information, permuting the
+input tokens merely permutes the outputs of self-attention: it cannot tell ``the
+man ate the fish'' from ``the fish ate the man'' at a given token position.
+An \emph{absolute positional encoding} adds a vector $p_i$ to each embedding,
+giving the layer input $\tilde x_i=x_i+p_i$. One fixed choice uses different
+sinusoidal frequencies in successive coordinate pairs:
+\begin{equation}
+  p_{i,2j}=\sin\!\left(\frac{i}{10000^{2j/d}}\right),\qquad
+  p_{i,2j+1}=\cos\!\left(\frac{i}{10000^{2j/d}}\right).
+  \label{eq:transformer-position}
+\end{equation}
+\noindent
+Positions may instead have learned vectors. A relative position scheme can add
+a learned bias $b_{i-j}$ to the attention score from position $i$ to position
+$j$. Both approaches make order available; the first labels individual
+positions, while the second labels their separation.
+
+\subsection{Self-Attention}
+
+Suppose $X\in\mathbb R^{N\times d}$ holds $N$ token vectors as rows, including
+their position information. Each token plays three learned roles. Its
+\emph{query} describes what information it seeks, its \emph{key} describes how
+it can be found, and its \emph{value} carries the information to contribute.
+Shared linear projections produce all three:
+\begin{equation}
+  Q=XW^Q,\qquad K=XW^K,\qquad V=XW^V,
+  \label{eq:transformer-qkv}
+\end{equation}
+\noindent
+where $W^Q,W^K\in\mathbb R^{d\times d_k}$ and
+$W^V\in\mathbb R^{d\times d_v}$. Query $q_i$ compares with every key $k_j$.
+The resulting scores pass through a softmax over $j$:
+\begin{equation}
+  s_{ij}=\frac{q_i k_j^{\mathsf T}}{\sqrt{d_k}},\qquad
+  a_{ij}=\frac{\exp(s_{ij})}{\sum_{\ell=1}^{N}\exp(s_{i\ell})},\qquad
+  y_i=\sum_{j=1}^{N}a_{ij}v_j.
+  \label{eq:transformer-attention}
+\end{equation}
+\noindent
+The nonnegative weights in each row sum to one. Thus $y_i$ is a weighted
+combination of values, with weights chosen separately for query $i$. The
+$1/\sqrt{d_k}$ factor keeps dot products from growing with key dimension when
+their coordinates have roughly unit variance; otherwise softmax can become so
+peaked that its gradients are small.
+
+For a small calculation, take $d_k=2$, $q=(1,0)$, keys $k_1=(1,0)$ and
+$k_2=(0,1)$, and values $v_1=(2,0)$ and $v_2=(0,2)$. The scores are
+$(1/\sqrt{2},0)$, so the softmax weights are approximately $(0.670,0.330)$.
+The output is $0.670(2,0)+0.330(0,2)=(1.340,0.660)$. Changing the query
+changes this mixture even when the two values stay the same.
+
+All queries can be processed together. With softmax applied separately to each
+row, Equation~\ref{eq:transformer-attention} becomes
+\begin{equation}
+  A=\operatorname{softmax}_{\mathrm{row}}\!\left(
+      \frac{QK^{\mathsf T}}{\sqrt{d_k}}\right),\qquad
+  Y=AV.
+  \label{eq:transformer-matrix-attention}
+\end{equation}
+\noindent
+Here $A\in\mathbb R^{N\times N}$ and $Y\in\mathbb R^{N\times d_v}$.
+Every output can use every input after one layer. Forming all pairwise scores
+takes $O(N^2d_k)$ arithmetic and $O(N^2)$ attention storage, which becomes
+costly for long sequences. Unlike a recurrent network, the score calculations
+for different positions can run in parallel.
+
+One attention pattern need not serve every relationship. \emph{Multihead
+attention} learns separate projections for $h$ heads, computes
+$H_r=\operatorname{Attention}(XW_r^Q,XW_r^K,XW_r^V)$ for each head $r$, and
+concatenates their outputs:
+\begin{equation}
+  \operatorname{MHA}(X)=
+  \operatorname{Concat}(H_1,\ldots,H_h)W^O.
+  \label{eq:transformer-mha}
+\end{equation}
+\noindent
+Each head can weight a different set of tokens. If its value width is $d_v$,
+then $W^O\in\mathbb R^{hd_v\times d}$ returns to the model width $d$.
+Multiple heads do not change the quadratic dependence on sequence length.
+
+\subsection{Transformer Layers}
+
+A transformer layer combines multihead attention with a small network applied
+independently to each token. Both parts have residual connections, as in
+Section~\ref{sec:resnet}, and layer normalization. The attention part mixes
+information \emph{between} tokens; the feed forward part transforms features
+\emph{within} each token. Figure~\ref{fig:transformer-layer} shows one layer.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, minimum width=2.25cm,
+      minimum height=0.85cm, align=center, font=\small},
+    link/.style={-{Latex[length=2mm]}, thick}
+  ]
+    \node[box] (input) at (0,0) {Input $X$};
+    \node[box] (attn) at (2.7,0) {Multihead\\attention};
+    \node[box] (norm1) at (5.4,0) {Add \& norm};
+    \node[box] (ffn) at (8.1,0) {Feed forward};
+    \node[box] (norm2) at (10.8,0) {Add \& norm};
+    \node[box] (output) at (13.5,0) {Output $Z$};
+    \draw[link] (input) -- (attn);
+    \draw[link] (attn) -- (norm1);
+    \draw[link] (norm1) -- (ffn);
+    \draw[link] (ffn) -- (norm2);
+    \draw[link] (norm2) -- (output);
+    \draw[link] (input.north) -- ++(0,1.05) -| (norm1.north);
+    \draw[link] (norm1.south) -- ++(0,-1.05) -| (norm2.south);
+  \end{tikzpicture}
+  \caption{One transformer layer. The upper and lower paths add each
+  sublayer's input to its output before normalization. The feed forward
+  network acts on each token separately.}
+  \label{fig:transformer-layer}
+\end{figure}
+
+\noindent
+For the layout shown, the operations can be written
+\begin{equation}
+  H=\operatorname{LN}\bigl(X+\operatorname{MHA}(X)\bigr),\qquad
+  Z=\operatorname{LN}\bigl(H+\operatorname{FFN}(H)\bigr).
+  \label{eq:transformer-layer}
+\end{equation}
+\noindent
+Layer normalization computes a mean and variance across the $d$ features of
+\emph{each token}, then applies learned scale and shift parameters. It does not
+require batch statistics. The same two dense layers and biases are reused at
+every position; for token row $h_i$ an example is
+\begin{equation}
+  \operatorname{FFN}(h_i)=
+  \operatorname{ReLU}(h_iW_1+b_1)W_2+b_2,
+  \quad W_1\in\mathbb R^{d\times d_{\mathrm{ff}}},\quad
+  W_2\in\mathbb R^{d_{\mathrm{ff}}\times d}.
+  \label{eq:transformer-ffn}
+\end{equation}
+\noindent
+Its input and output both have width $d$, so the second residual addition is
+valid. Stacking layers lets each token repeatedly gather context and transform
+what it gathered. A transformer \emph{encoder} uses such layers to represent
+an entire input sequence. A \emph{decoder} uses transformer layers to produce
+an output sequence, restricting attention when it must predict tokens in order.
+
+\subsection{Encoders and Transfer Learning}
+
+An encoder reads all input tokens at once. Its attention is bidirectional: an
+output token may use words both before and after its position. This makes an
+encoder useful when the whole input is available and the goal is to understand
+it. BERT is an encoder example. During masked-language-model pretraining, some
+input tokens are hidden and the model predicts their identities from the
+surrounding tokens. A classifier applied to the output at a masked position
+produces a probability for each vocabulary entry; training increases the
+probability of the original entry. The target is a \emph{token identity}, not
+the hidden token's embedding vector. Because the same layers must recover many
+different missing tokens, their outputs learn contextual representations.
+
+These representations can support several tasks. For sentence classification,
+a special $[\mathrm{CLS}]$ token is inserted and its final output is passed to
+a small classification head. Sentiment classification is one example. A pair
+of sentences can be encoded together for a relation decision. For token
+classification, a head reads each token's final output, as in named-entity
+recognition, where words are labeled as person, place, organization, or none.
+Span annotation marks a contiguous range of tokens, for example by predicting
+its start and end. The output used by the head therefore depends on whether
+the target describes a whole input, each token, or a span.
+
+Pretraining first learns reusable features on a large source dataset; a
+labeled target dataset then adapts the model. In \emph{fine-tuning}, the new
+task's loss updates some or all pretrained weights as well as the task head.
+Alternatively, a \emph{linear probe} freezes the encoder and trains only a
+linear head. Freezing reduces the number of trained parameters, but does not
+remove the encoder at test time. Fine-tuning does not require freezing all
+layers except the head. Transfer can help even when source and target tasks
+differ because early visual filters or general contextual features are useful
+across tasks; the final decision rule may still need to be learned for the new
+labels. This is why a pretrained initialization can be better than random
+weights without promising that every feature or class decision transfers.
+
+\subsection{Decoders and Cross-Attention}
+
+A decoder generates one token at a time. For tokens $t_1,\ldots,t_N$, an
+autoregressive model factors their joint probability as
+\begin{equation}
+  p(t_1,\ldots,t_N)
+  =\prod_{i=1}^{N}p(t_i\mid t_1,\ldots,t_{i-1}).
+  \label{eq:transformer-autoregressive}
+\end{equation}
+\noindent
+A GPT-style decoder implements these conditional distributions. The output at
+position $i$ predicts the next token from a softmax over the vocabulary.
+\emph{Causal masking} prevents a query at position $i$ from attending to
+future positions $j>i$: their attention scores are set to $-\infty$ before
+softmax. Without that mask, training could read the answer it is meant to
+predict. A start token and a shifted target sequence align each output with
+its next-token target. Known target tokens can be processed in parallel during
+training because the mask hides later tokens. At inference, each new token
+must be chosen before the next step, so generation remains sequential.
+Providing a few examples in the input prompt can guide a pretrained decoder
+without changing its weights; this is in-context or few-shot learning, not
+fine-tuning.
+
+For translation, the source sentence is already known, but the target sentence
+must be generated in order. An encoder first forms source representations
+$E\in\mathbb R^{N_e\times d}$. The decoder uses masked self-attention over its
+target prefix and then \emph{cross-attention}: its target states
+$D\in\mathbb R^{N_d\times d}$ supply queries, while the encoder states supply
+keys and values,
+\begin{equation}
+  Q=DW^Q,\quad K=EW^K,\quad V=EW^V,\qquad
+  C=\operatorname{softmax}_{\mathrm{row}}\!\left(
+       \frac{QK^{\mathsf T}}{\sqrt{d_k}}\right)V.
+  \label{eq:transformer-cross-attention}
+\end{equation}
+\noindent
+The cross-attention weights have shape $N_d\times N_e$: each target position
+can select information from every source position. The causal mask applies to
+target self-attention, not to these known source states. Translation training
+again predicts each next target token; at inference, the decoder uses its
+previously generated target tokens. Table~\ref{tab:transformer-roles} separates
+the three common layouts.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.0cm}p{5.5cm}p{4.9cm}@{}}
+    \toprule
+    Layout & Information available & Typical output \\
+    \midrule
+    Encoder & all input tokens & sequence or token labels \\
+    Decoder & past target tokens only & next-token probabilities \\
+    Encoder--decoder & source and past target tokens & translated sequence \\
+    \bottomrule
+  \end{tabular}
+  \caption{Which tokens each transformer layout can read when forming an
+  output. The attention mask determines whether future target tokens are
+  hidden.}
+  \label{tab:transformer-roles}
+\end{table}
+
+\noindent
+Full attention over $N$ tokens uses the $N\times N$ weight matrix from
+Equation~\ref{eq:transformer-matrix-attention}. Its quadratic storage and
+compute become expensive for long text or dense images. Restricting a token to
+a local neighborhood, using sparse connections, or introducing selected global
+tokens reduces the number of interactions, but also changes which pairs can
+exchange information directly. A decoder's triangular causal mask prevents
+future leakage; by itself it does not remove the quadratic cost of full
+attention over the allowed prefix.
+
+\subsection{Vision and Multiscale Transformers}
+
+An image has many more pixels than a typical sentence has words. Treating each
+pixel as a token makes global attention expensive: a $224\times224$ image has
+$50{,}176$ pixel positions, so its attention matrix has over $2.5$ billion
+entries per head. Early pixel-generating transformer decoders such as ImageGPT
+therefore operated on small images. A Vision Transformer (ViT) reduces the
+sequence length by dividing an $H\times W\times C$ image into nonoverlapping
+$P\times P$ patches. Assuming $P$ divides both dimensions, the number of
+patches is
+\begin{equation}
+  N=\frac{H}{P}\frac{W}{P}=\frac{HW}{P^2},\qquad
+  f_i\in\mathbb R^{P^2C},\qquad
+  z_i=f_iW^E+p_i\in\mathbb R^d,
+  \label{eq:vit-patches}
+\end{equation}
+\noindent
+where $f_i$ is a flattened patch, $W^E\in\mathbb R^{P^2C\times d}$ is shared
+across patches, and $p_i$ is a learned positional vector. The linear patch
+projection is equivalent to a convolution with kernel size and stride $P$,
+but the following encoder uses attention rather than local convolutions.
+A learned $[\mathrm{CLS}]$ vector is prepended to the $N$ patch tokens, so
+the encoder processes $N+1$ tokens. Its final class-token output passes
+through a classification head and softmax. Patch positions must be encoded:
+without them, rearranging patches would only rearrange their outputs and the
+class token could not recover where image content appeared.
+
+For a $224\times224$ RGB image with $P=16$, each flattened patch has
+$16^2\cdot3=768$ values and there are $(224/16)^2=196$ patches, or $197$
+tokens with the class token. A head's attention matrix is then
+$197\times197$, instead of $50{,}176\times50{,}176$ for pixel tokens. This
+calculation explains why patch size matters: smaller patches retain finer
+detail but increase attention cost quadratically with their count.
+
+Unlike a convolutional network, a plain ViT has no architectural requirement
+that nearby pixels interact first or that shifting an image shifts its feature
+map in the same way. Any patch can attend to any other patch in the first
+layer. Convolutions instead start with local neighborhoods and build a larger
+receptive field across layers. This built-in locality and translation
+equivariance help CNNs learn from limited images. ViT must learn useful
+spatial relationships from data, but large-scale pretraining can make its
+global interactions effective. Attention distance makes the contrast visible:
+the average distance between a query patch and its attended patches can be
+large even in early ViT layers, while a small convolution initially sees only
+its local neighborhood. For a new classification task, a pretrained ViT can
+be fine-tuned, or its encoder can be frozen and a new head trained.
+
+Plain ViT keeps one patch scale throughout. A shifted-window transformer
+(Swin) instead computes attention within small windows of the patch grid.
+The next block shifts the window partition so patches previously separated by
+a window boundary can exchange information. Periodic \emph{patch merging}
+combines each $2\times2$ group of neighboring patch features and projects it
+to a new channel width. Spatial resolution falls while the receptive field
+grows, giving a hierarchy more like a CNN. If each attention window contains
+at most $M$ tokens, its attention storage over all windows is $O(NM)$ rather
+than $O(N^2)$ for global attention, when $M$ is fixed. The shift is essential:
+without it, repeated window attention cannot pass information across window
+boundaries at the same scale.
+The self-supervised ViT case DINOv2 is explained in
+Appendix~\ref{app:foundation}.

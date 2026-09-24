@@ -463,3 +463,28 @@ the whole observed image. A typical example is a contrast-sensitive pairwise
 term that penalizes a label change less where the image has a strong edge. A
 CRF is therefore discriminative: it never models how the image was generated,
 only which labelings are plausible given it.
+
+\newpage
+\section{Foundation Models and DINOv2}
+\label{app:foundation}
+
+A foundation model learns a reusable representation from broad data and is
+then adapted to several tasks. The architecture and the training objective are
+separate choices: a Vision Transformer describes how image patches interact;
+pretraining determines which information its features retain. Supervised
+pretraining uses class labels, self-supervised pretraining constructs targets
+from the images themselves, and image--text training can use paired captions
+as weaker supervision. On a new task, one can fine-tune the model or freeze it
+and train a small head. A frozen backbone still runs at inference; freezing
+only saves training updates.
+
+DINOv2 is an image-only, self-supervised ViT foundation model. Its training
+uses different views of the same image and makes a student network agree with
+a teacher network, rather than requiring human class labels or image captions.
+The resulting class-token and patch features can be reused for image
+classification, retrieval, segmentation, and depth estimation. A linear probe
+tests a frozen representation with a trained linear head; dense tasks instead
+use spatial patch features. DINOv2 differs from a supervised ViT in its
+training signal, and from CLIP-style image--text models in that it does not
+learn from caption alignment. These distinctions explain how one pretrained
+image encoder can support both whole-image and pixel-level tasks.
