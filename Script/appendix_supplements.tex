@@ -488,3 +488,46 @@ use spatial patch features. DINOv2 differs from a supervised ViT in its
 training signal, and from CLIP-style image--text models in that it does not
 learn from caption alignment. These distinctions explain how one pretrained
 image encoder can support both whole-image and pixel-level tasks.
+
+\section{Contrastive and Energy-Based Self-Supervision}
+\label{app:ssl}
+
+The pretext tasks of Section~\ref{sec:gan} reconstruct pixels or predict an
+arrangement. A second family learns representations by \emph{comparing}
+images. Its central idea is that two views of the same image should receive
+similar representations, while views of different images should not. The views
+are created by \emph{data augmentation}: random crops, flips, color jitter,
+blur.
+
+\paragraph{Contrastive learning.}
+An encoder maps two augmented views of image $n$ to normalized embeddings
+$u_n$ and $v_n$. The pair $(u_n,v_n)$ is \emph{positive}; the views of other
+images in the batch act as \emph{negatives}. With similarity
+$s(u,v)=u^{\mathsf T}v/\tau$ and temperature $\tau$, the InfoNCE loss
+\begin{equation}
+  L = -\frac{1}{N}\sum_{n=1}^{N}\log
+      \frac{\exp s(u_n,v_n)}{\sum_{m=1}^{N}\exp s(u_n,v_m)}
+  \label{eq:infonce}
+\end{equation}
+\noindent
+is a softmax classification: among $N$ candidates, find the view that came from
+the same image. Without augmentation there would be no positive pair to compare,
+so data augmentation is what creates the training signal and hence the
+gradient. The augmentations also decide which properties the representation
+ignores; with color jitter, the embedding learns to disregard color. SimCLR
+and MoCo are examples; CLIP applies the same loss to image--text pairs.
+
+\paragraph{Energy-based view.}
+An energy-based model assigns a scalar energy $E(x,x')$ to a pair of inputs:
+low energy for compatible pairs, high energy for incompatible ones. In
+self-supervised learning, a compatible pair is two views of the same content,
+for example two augmentations or two video frames, and the energy is usually a
+distance between their embeddings. Training lowers the energy of compatible
+pairs. It must also keep the energy of other pairs high, either with negatives
+as in contrastive learning or with regularization of the embedding statistics.
+Without this, all inputs collapse onto one embedding with zero energy. The goal
+is \emph{not} to map images with small mean-square pixel distance to the same
+region. Pixel distance is a poor semantic measure: a shifted or recolored image
+of the same object is far away in pixel space, yet should be close in the
+representation, while two uniform gray images of different scenes are close in
+pixel space.
