@@ -1,0 +1,564 @@
+\section{Multimodal Language Models and LLM Applications}
+\label{sec:mllm}
+
+Large language models (LLMs) show strong reasoning abilities in dialogue,
+step-by-step argumentation, math problems, and code writing. They learn all of
+this from text alone. A robot that should ``bring me the rice chips from the
+drawer'' needs more: it must know where the drawer is, whether it is open, and
+which object in the camera image is the bag of chips. This is the
+\emph{grounding problem}. LLM representations must be connected to what the
+system perceives (images, sensor states), to what it can do (actions in the
+physical world), and to facts about the concrete scene, such as its geometric
+configuration. Text-only training never supplies this link between words and
+percepts.
+
+This section treats two answers to the grounding problem. The first is
+architectural: PaLM-E injects continuous sensor observations directly into the
+embedding space of a pretrained LLM and trains the combination end-to-end, so
+that one model plans robot actions, answers visual questions, and writes
+captions. The second is practical: an application program calls an existing
+vision-capable LLM through an API and wraps it in a small workflow graph that
+decides what to do with each image. Both build on the decoder-only transformer
+of Section~\ref{sec:transformers} and on the Vision Transformer (ViT) of
+Equation~\ref{eq:vit-patches}.
+
+\subsection{Decoder-Only Language Models and Prompts}
+
+A decoder-only LLM is a generative model of text. Text is represented as a
+token sequence $w_{1:L}=(w_1,\dots,w_L)$, and the model assigns it a
+probability by the autoregressive factorization of
+Equation~\ref{eq:transformer-autoregressive},
+\begin{equation}
+  p(w_{1:L}) = \prod_{l=1}^{L} p_{\mathrm{LM}}(w_l \mid w_{1:l-1}) .
+  \label{eq:mllm-lm}
+\end{equation}
+\noindent
+Here $p_{\mathrm{LM}}$ is the transformer with causal masking: the output at
+position $l$ is a softmax over the vocabulary and predicts the next token.
+Before the first layer, every token passes through the embedding table,
+written here as a function $\gamma:\mathcal W\to\mathbb R^k$ that maps a
+vocabulary entry $w$ to a vector $x=\gamma(w)$ in a $k$-dimensional
+embedding space.
+
+A \emph{prefix-decoder} LLM splits the sequence into a given prefix
+$w_{1:n}$ and a continuation that the model predicts:
+\begin{equation}
+  p(w_{n+1:L}\mid w_{1:n})
+    = \prod_{l=n+1}^{L} p_{\mathrm{LM}}(w_l \mid w_{1:l-1}) .
+  \label{eq:mllm-prefix}
+\end{equation}
+\noindent
+The prefix, often called the \emph{prompt}, provides the context. It may
+describe the task (``Q: How can the yellow block be moved onto the blue plate?
+A:''), contain earlier dialogue, or show a few solved examples. The LLM
+continues the prefix, and that continuation is the answer. Three prompt
+regimes follow from this view and appear repeatedly below:
+\begin{itemize}
+  \item \emph{Zero-shot}: the prefix contains only the task, no solved
+    examples. The model must rely on what it learned in pretraining.
+  \item \emph{Few-shot} (in-context learning): the prefix contains a few
+    input--output examples, and the model continues the pattern. The weights
+    do not change; only the input does.
+  \item \emph{Chain of thought} (CoT): the prefix asks for, or demonstrates,
+    intermediate reasoning steps before the final answer (``Let's think step
+    by step''). Spelling out steps turns one hard prediction into several
+    easier next-token predictions, each conditioned on the previous steps.
+\end{itemize}
+
+\noindent
+All three change behavior at inference time without training. This makes a
+pretrained LLM a general interface: whoever can express a task as a prefix
+can use it. The rest of the section asks what happens when parts of that
+prefix are not words but images and sensor readings.
+
+\subsection{PaLM-E: Injecting Observations into the Language Embedding Space}
+
+An \emph{embodied language model} incorporates continuous inputs from the
+real-world sensor and actuator modalities of an agent, such as a robot, into
+a language model. PaLM-E (``Pathways Language Model, Embodied'') builds it
+from PaLM, a large pretrained decoder-only LLM. The central idea is simple.
+The LLM already processes a sequence of $k$-dimensional vectors. If an image
+or a state estimate is encoded into vectors of the same dimension $k$, it can
+be placed into the same sequence as the word embeddings and processed by the
+self-attention layers \emph{in the same way as text}. Nothing in the
+transformer needs to change.
+
+The input is a \emph{multimodal sentence}: text with interleaved
+placeholders for observations, for example
+\begin{center}
+  \texttt{Q: What happened between <img\_1> and <img\_2>?}
+\end{center}
+\noindent
+Formally, an encoder $\phi_j$ maps observation $O_j$ (an image, a state
+vector, a 3D scene) to a sequence of $q_j$ vectors,
+$\phi_j(O_j)\in\mathbb R^{q_j\times k}$. The input vector at position $i$ is
+then
+\begin{equation}
+  x_i =
+  \begin{cases}
+    \gamma(w_i) & \text{if position } i \text{ is a text token},\\
+    \phi_j(O_j)_i & \text{if position } i \text{ belongs to observation } O_j .
+  \end{cases}
+  \label{eq:mllm-multimodal-sentence}
+\end{equation}
+\noindent
+The placeholder \texttt{<img\_1>} is thus replaced by $q_1$ vectors, not by
+one token. Observation vectors can sit anywhere between the text tokens, so
+the text can refer to an image before or after it and several images can be
+compared. Figure~\ref{fig:palme-architecture} shows the complete model.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, minimum height=0.8cm,
+      align=center, font=\scriptsize},
+    tok/.style={draw, minimum width=0.42cm, minimum height=0.42cm,
+      inner sep=0pt},
+    arr/.style={-{Latex[length=2mm]}, thick},
+    lbl/.style={font=\scriptsize, align=center}
+  ]
+    % inputs
+    \node[box, fill=blue!10, minimum width=1.6cm] (img) at (0,0)
+      {image $I$};
+    \node[box, fill=blue!10, minimum width=1.6cm] (vit) at (0,1.35)
+      {ViT $+$ $\psi$};
+    \node[box, fill=yellow!20, minimum width=2.6cm] (txt) at (4.9,0)
+      {text: ``Q: How to grasp\\the white object? A:''};
+    \node[box, fill=yellow!20, minimum width=2.6cm] (emb) at (4.9,1.35)
+      {token embedder $\gamma$};
+    \draw[arr] (img) -- (vit);
+    \draw[arr] (txt) -- (emb);
+    % token row
+    \foreach \i in {0,...,3}
+      \node[tok, fill=blue!25] (v\i) at (-0.63+\i*0.42,2.6) {};
+    \foreach \i in {0,...,6}
+      \node[tok, fill=yellow!45] (t\i) at (3.64+\i*0.42,2.6) {};
+    \node[lbl] at (1.5,2.6) {$\cdots$};
+    \draw[arr] (vit) -- (0,2.35);
+    \draw[arr] (emb) -- (4.9,2.35);
+    \draw[decorate, decoration={brace, amplitude=4pt}]
+      (-0.85,2.9) -- (5.3,2.9)
+      node[midway, above=5pt, lbl] {multimodal sentence
+      $x_1,\dots,x_n$ (prefix), all in $\mathbb R^k$};
+    % LLM
+    \node[box, fill=green!12, minimum width=7.2cm, minimum height=0.9cm]
+      (llm) at (2.2,4.35) {decoder-only LLM (PaLM), causal self-attention};
+    \draw[arr] (2.2,3.45) -- (llm.south);
+    % output
+    \node[box, fill=orange!15, minimum width=5.6cm] (out) at (2.2,5.75)
+      {``First, grasp the orange object and place it \dots''};
+    \draw[arr] (llm) -- (out);
+    \node[lbl, above=2pt of out] {output text: answer or plan};
+    % robot loop
+    \node[box, fill=gray!12, minimum width=1.9cm] (pol) at (8.9,5.75)
+      {low-level\\policy};
+    \node[box, fill=gray!12, minimum width=1.9cm] (rob) at (8.9,1.35)
+      {robot acts,\\camera observes};
+    \draw[arr] (out.east) ++(0,0) -- (pol.west);
+    \draw[arr] (pol) -- node[right, lbl] {motor\\commands} (rob);
+    \draw[arr, dashed] (rob.south) |- node[pos=0.75, below, lbl]
+      {new image (closed loop)} (img.east |- 0,-0.9) -- (img.south);
+  \end{tikzpicture}
+  \caption{PaLM-E. An encoder turns each observation into a few vectors of
+  the LLM's embedding dimension $k$. They are interleaved with the word
+  embeddings to a multimodal prefix, and the pretrained LLM continues it
+  with text. For robot tasks, the text is a plan step that a low-level policy
+  executes; the next camera image starts the next planning step.}
+  \label{fig:palme-architecture}
+\end{figure}
+
+\noindent
+The output is always text. For visual question answering (VQA) and
+captioning, the text is the answer or description. For robotics, the text is
+a sequence of high-level decisions (``pick the green block,'' ``push it to
+the corner''). PaLM-E does not output joint angles itself. A separate
+\emph{low-level policy}, a smaller learned controller that understands such
+short language commands, translates each step into motor commands. After the
+step, the robot takes a new image, and PaLM-E is queried again with it. This
+\emph{closed-loop} planning lets the model react to failures and
+disturbances: if a person moves the chips back into the drawer, the next
+image shows it, and the plan adapts.
+
+\paragraph{Worked example: sequence length.}
+An image of $224\times224$ pixels encoded by a ViT with patch size $P=14$
+gives $(224/14)^2=16^2=256$ patch features
+(Equation~\ref{eq:vit-patches}). A learned projection $\psi$ maps each
+feature from the ViT width to the LLM width $k$. The image therefore
+occupies $q=256$ positions of the prefix. The question ``What happened
+between <img\_1> and <img\_2>?'' with about $10$ text tokens becomes a
+prefix of roughly $2\cdot256+10=522$ vectors. Images, not words, dominate the
+sequence length and thus the quadratic attention cost. This is one reason to
+prefer compact encoders, such as the object-centric ones below, that describe
+a scene with few vectors.
+
+\subsection{Encoders for Different Sensor Modalities}
+
+Equation~\ref{eq:mllm-multimodal-sentence} leaves the encoder $\phi$ open.
+Its job is to map an observation into vectors the LLM can use, and different
+modalities call for different encoders. PaLM-E compares several
+(Table~\ref{tab:palme-encoders}).
+
+\begin{itemize}
+  \item \emph{State estimation vectors.} If the robot or a perception system
+    already provides a state $s\in\mathbb R^S$, e.g.\ the poses of all objects,
+    a multilayer perceptron maps it into the embedding space,
+    $\phi_{\mathrm{state}}(s)\in\mathbb R^{k}$. This is the simplest input but
+    requires a working state estimator and fixes which quantities are known.
+  \item \emph{Vision Transformer.} A pretrained ViT
+    $\tilde\phi_{\mathrm{ViT}}$ maps the image $I$ to $m$ token features. Its
+    feature width generally differs from $k$, so a learned affine map $\psi$
+    projects each feature:
+    $\phi_{\mathrm{ViT}}(I)=\psi\bigl(\tilde\phi_{\mathrm{ViT}}(I)\bigr)
+    \in\mathbb R^{m\times k}$. This works on raw pixels and needs no state
+    estimator. Its tokens, however, describe image patches, not objects.
+  \item \emph{Object-centric representations.} Planning statements are about
+    objects (``put the red block on the plate''). Object-centric encoders
+    separate the visual input into distinct objects before injecting it into
+    the LLM. Conceptually this requires instance masks $M_j$: the object token
+    is $\phi_{\mathrm{ViT}}(I\circ M_j)$, the ViT applied to the masked image.
+    Ground-truth masks are available in simulation but not in the real world.
+  \item \emph{Object Scene Representation Transformer (OSRT).} OSRT learns a
+    neural 3D scene representation from several views without supervision.
+    It discovers objects by itself and represents the scene by a set of
+    \emph{object slots} $o_j$. Each slot is projected by an MLP to one or
+    more tokens. This gives object-centric, 3D-aware inputs without
+    ground-truth masks.
+\end{itemize}
+
+\noindent
+Object-centric encoders enable \emph{entity referrals}. The prefix can name
+each object with its own tokens, e.g.\ ``Object 1 is <obj\_1>. Object 2 is
+<obj\_2>. \dots'' The model can then answer ``Push obj\_2 to the left'' and
+the low-level policy knows exactly which object is meant. A plain ViT
+encoding offers no such handle; the plan must describe objects by color or
+position, which is ambiguous when several objects look alike.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.6cm}p{3.1cm}p{3.6cm}p{4.2cm}@{}}
+    \toprule
+    Encoder & Input & Tokens produced & Main strength / limitation \\
+    \midrule
+    State MLP & state vector $s$ & one vector per state & compact and exact;
+      needs a state estimator \\
+    ViT $+\psi$ & raw image & one per patch (e.g.\ 256) & general, pretrained
+      at scale; not object-based \\
+    Object-centric ViT & image and masks $M_j$ & tokens per object & supports
+      entity referrals; needs masks \\
+    OSRT & multi-view images & tokens per object slot & 3D-aware, objects
+      learned without masks; most data-efficient \\
+    \bottomrule
+  \end{tabular}
+  \caption{Input encoders compared in PaLM-E. All map an observation to
+  vectors of the LLM embedding dimension $k$; they differ in what structure
+  they impose on the scene.}
+  \label{tab:palme-encoders}
+\end{table}
+
+\subsection{Training PaLM-E and Its Design Choices}
+
+PaLM-E is trained end-to-end on a dataset of multimodal examples. Example $i$
+consists of $u_i$ continuous observations $O^i_{1:u_i}$, a token sequence
+$w^i_{1:L_i}$ with placeholders for them, and an index $n_i$ that marks where
+the prefix ends. The loss is the ordinary next-token cross-entropy, but only
+on the continuation:
+\begin{equation}
+  \mathcal L = -\sum_i \sum_{l=n_i+1}^{L_i}
+    \log p_{\mathrm{LM}}\bigl(w^i_l \mid x^i_{1:l-1}\bigr),
+  \label{eq:mllm-loss}
+\end{equation}
+\noindent
+where $x^i$ is the multimodal sentence of
+Equation~\ref{eq:mllm-multimodal-sentence}. The prefix, containing the
+images and the question, is only conditioned on; the model is never trained
+to predict it. Observation vectors are not tokens from the vocabulary, so
+there is no target to predict at those positions anyway. Gradients flow
+through the LLM into the projection $\psi$ and the encoder, which learn to
+produce vectors that the LLM can ``read.''
+
+\paragraph{Worked example: which tokens are trained.}
+Take the training example ``<img> Q: What color is the cube? A: red.'' with
+$256$ image vectors, $8$ question tokens, and $2$ answer tokens (``red,''
+``.''). Then $n_i=264$, and the loss sums over just the two answer positions.
+If the model predicts $p(\text{red}\mid\text{prefix})=0.5$ and
+$p(\text{.}\mid\text{prefix, red})=0.9$, the example contributes
+$-\log0.5-\log0.9\approx0.69+0.11=0.80$. The $264$ prefix positions still
+matter: every answer prediction attends to them, so their encoders receive
+gradients through attention.
+
+\paragraph{Frozen or fine-tuned LLM.}
+Two training regimes are possible:
+\begin{itemize}
+  \item \emph{Full fine-tuning}: encoder, projection, and LLM weights are all
+    updated. The model can adapt its language layers to the new inputs but
+    may lose some of its original abilities.
+  \item \emph{Frozen LLM}: only the encoder $\phi$ and projection $\psi$ are
+    trained. The encoder must learn to translate observations into vectors
+    that the fixed LLM already understands. Because these vectors act like a
+    learned, image-dependent prompt, this is called \emph{input-conditioned
+    soft prompting}. It keeps the language abilities intact by construction.
+\end{itemize}
+
+\noindent
+Encoders can themselves be pretrained (a large ViT, a pretrained OSRT) or
+trained from scratch. The data question is \emph{sample complexity}: robot
+data are expensive to collect, often only a few hundred demonstrations per
+task, while images with text are abundant on the web.
+
+\paragraph{Multi-task training and transfer.}
+PaLM-E is trained on a \emph{mixture} of tasks: robot planning in several
+environments (tabletop task and motion planning, the Language-Table pushing
+environment, mobile manipulation in a kitchen), general vision--language data
+(VQA, captioning), and pure language tasks. A key finding is \emph{positive
+transfer}: the model trained on the full mixture solves each robot task
+better than a model trained on that task alone. Knowledge from web-scale
+vision--language data carries over to robotics, so a robot task needs
+considerably fewer of its own examples. Transfer thus yields high data
+efficiency for robotics, and the same model supports zero-shot multimodal
+CoT, few-shot prompting, OCR-free math reasoning from images, and
+multi-image reasoning.
+
+\paragraph{Scaling and catastrophic forgetting.}
+PaLM-E was built at several sizes by combining a PaLM LLM with a ViT, e.g.\
+an 8B-parameter LLM with a 4B ViT (PaLM-E-12B) up to a 540B LLM with a 22B
+ViT (PaLM-E-562B). When the LLM is fine-tuned on multimodal data, it can
+\emph{catastrophically forget} its pure-language abilities: new gradients
+overwrite what the old weights encoded. PaLM-E observed that this forgetting
+shrinks strongly with scale. The smallest model lost most of its
+language-generation performance, the largest only a few percent. Larger
+models have enough capacity to add the new modality without giving up the
+old skills. Freezing the LLM avoids forgetting entirely, at the price of less
+adaptation.
+
+\paragraph{Emergent capabilities.}
+Some abilities appear in the largest model without having been trained
+explicitly. With \emph{zero-shot multimodal chain of thought}, the model,
+given only the prompt, spells out a step-by-step reasoning narrative that
+mixes textual and visual evidence before stating its final answer, e.g.\
+``The image shows two bottles of water and one of juice. \dots\ So the answer
+is three.'' With \emph{multi-image reasoning}, it compares several images in
+one prompt, although training examples mostly contained single images. It
+also shows \emph{zero-shot generalization} in robotics to unseen object
+pairings or unseen objects. Table~\ref{tab:palme-summary} collects the
+research questions and the answers PaLM-E gives.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{5.6cm}p{8.2cm}@{}}
+    \toprule
+    Question & Finding \\
+    \midrule
+    Can pixels or states be input to an LLM while keeping its
+      generalization? & yes, encoded into the word embedding space and
+      interleaved with text \\
+    Which input representation works best? & object-centric, 3D-aware (OSRT)
+      is most data-efficient; ViT is the general choice for raw images \\
+    Frozen or fine-tuned LLM? & frozen LLM with trained encoder already works
+      (soft prompting); fine-tuning adapts more but risks forgetting \\
+    Single-task or mixture training? & mixture gives positive transfer and
+      higher data efficiency on robot tasks \\
+    Effect of scale? & less catastrophic forgetting of language; emergent
+      multimodal CoT and multi-image reasoning \\
+    \bottomrule
+  \end{tabular}
+  \caption{Research questions of PaLM-E and its answers. One generalist
+  model covers robot planning, vision--language, and language tasks.}
+  \label{tab:palme-summary}
+\end{table}
+
+\noindent
+PaLM-E fits the general notion of a foundation model, a model trained on
+broad data and adapted to many tasks (Appendix~\ref{app:foundation}). Its
+vision encoder is exactly such a pretrained model, and the LLM is another.
+PaLM-E shows how two foundation models from different modalities can be
+joined through a shared embedding space.
+
+\subsection{Using an LLM Through an API: A Visual Task Agent}
+
+Training a model like PaLM-E requires resources few groups have. In practice,
+vision-capable LLMs are available as services: an application sends images
+and text over an HTTP API and receives text back. Such a model can already
+describe images, read text in them, and answer questions. What remains for
+the application developer is to decide \emph{what} to ask, and \emph{what to
+do} with the answer. A program that makes these decisions, possibly calling
+other tools, is called an \emph{agent}.
+
+Consider a \emph{visual task helper} that receives images of different
+kinds and must treat them differently:
+\begin{itemize}
+  \item a \emph{family image} should get a friendly scene summary;
+  \item a \emph{product image} should trigger a secondary tool, e.g.\ a
+    search API queried with the detected objects;
+  \item a \emph{document or sign} should go to optical character recognition
+    (OCR) so that its text is extracted verbatim.
+\end{itemize}
+
+\noindent
+The flow is: take an image (a local file or a webcam frame); let a vision
+model describe it; let the agent decide, based on that description, whether
+to summarize the scene, extract text, or call a tool; return the result.
+Figure~\ref{fig:vision-agent} shows this flow as a graph.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, minimum height=0.8cm,
+      minimum width=1.9cm, align=center, font=\scriptsize},
+    dec/.style={draw, diamond, aspect=1.8, inner sep=1pt, align=center,
+      font=\scriptsize, fill=yellow!20},
+    arr/.style={-{Latex[length=2mm]}, thick},
+    lbl/.style={font=\scriptsize, align=center}
+  ]
+    \node[box, fill=blue!10] (in) at (0,0) {image\\(file, webcam)};
+    \node[box, fill=green!12] (desc) at (2.8,0) {vision LLM:\\describe};
+    \node[dec] (route) at (5.7,0) {route};
+    \node[box] (sum) at (9.0,1.3) {summarize\\scene};
+    \node[box] (ocr) at (9.0,0) {OCR: extract\\text};
+    \node[box] (tool) at (9.0,-1.3) {tool call\\(search API)};
+    \node[box, fill=orange!15] (out) at (11.9,0) {answer};
+    \draw[arr] (in) -- (desc);
+    \draw[arr] (desc) -- node[above, lbl] {state} (route);
+    \draw[arr] (route.north) |- node[pos=0.75, above, lbl] {family} (sum.west);
+    \draw[arr] (route.east) -- node[above, lbl] {document} (ocr.west);
+    \draw[arr] (route.south) |- node[pos=0.75, below, lbl] {product}
+      (tool.west);
+    \draw[arr] (sum.east) -- (out);
+    \draw[arr] (ocr.east) -- (out);
+    \draw[arr] (tool.east) -- (out);
+  \end{tikzpicture}
+  \caption{Visual task agent as a workflow graph. Nodes are processing
+  steps, which may call an LLM or a tool. The routing node reads the shared
+  state, here the image description, and selects the branch.}
+  \label{fig:vision-agent}
+\end{figure}
+
+\paragraph{LangChain and LangGraph.}
+Two open-source frameworks support such programs. \emph{LangChain} provides
+building blocks for LLM-powered applications and agents: uniform wrappers
+around model providers, message and prompt templates, output parsers, and
+tool definitions. \emph{LangGraph} orchestrates LLM and agent workflows as a
+\emph{graph}. Each node is a function that reads and updates a shared
+\emph{state} (here: the image, its description, the chosen route, the
+result). Edges fix the order of nodes; \emph{conditional edges} call a
+routing function on the state and branch accordingly. Loops are allowed, so
+an agent can also retry or ask a follow-up question. Making the control flow
+an explicit graph keeps it inspectable and testable, instead of hiding every
+decision inside one long prompt.
+
+\paragraph{A request to a vision LLM.}
+A chat API receives a list of \emph{messages}, each with a role
+(\texttt{system} for standing instructions, \texttt{user} for the request,
+\texttt{assistant} for earlier model replies). A user message can mix text
+and images; a local image is usually sent base64-encoded. The core of the
+``describe'' node and the graph wiring look like this in Python:
+
+\begin{small}
+\begin{verbatim}
+from openai import OpenAI
+client = OpenAI()               # reads OPENAI_API_KEY from the environment
+
+def describe(state):
+    b64 = state["b64"]          # base64-encoded JPEG
+    msg = [{"role": "user", "content": [
+        {"type": "text", "text": "Describe the image. Is it a family photo,"
+                                 " a product, or a document?"},
+        {"type": "image_url",
+         "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]}]
+    r = client.chat.completions.create(model="gpt-4o-mini", messages=msg)
+    return {"description": r.choices[0].message.content}
+
+from langgraph.graph import StateGraph, END
+g = StateGraph(State)                       # State: a typed dict
+g.add_node("describe", describe)
+g.add_node("summarize", summarize); g.add_node("ocr", ocr)
+g.add_node("search", search)
+g.set_entry_point("describe")
+g.add_conditional_edges("describe", route,  # route(state) -> key
+    {"family": "summarize", "document": "ocr", "product": "search"})
+for n in ("summarize", "ocr", "search"): g.add_edge(n, END)
+app = g.compile(); result = app.invoke({"b64": image_b64})
+\end{verbatim}
+\end{small}
+
+\noindent
+Here \texttt{route} can be a plain keyword test on the description or a
+second LLM call that answers with one of the three keys. The multimodal
+message is the practical counterpart of PaLM-E's multimodal sentence: the
+provider's model turns the image into embedding vectors and places them in
+the prompt next to the text tokens. The developer only sees text in and text
+out.
+
+\paragraph{API keys and running the agent.}
+The service authenticates each request with a secret \emph{API key}. It is
+created on the provider's developer platform (for billing, a small prepaid
+balance suffices) and stored in a \texttt{.env} file in the project folder,
+e.g.\ \texttt{OPENAI\_API\_KEY="sk-..."}. The program loads it into the
+environment (e.g.\ with \texttt{python-dotenv}); the client library reads it
+from there. The key must never appear in code or in a public repository:
+anyone who has it can make requests billed to the owner. Add \texttt{.env} to
+\texttt{.gitignore} and, where possible, create the key with restricted
+permissions. A reproducible Python environment is set up with conda,
+\begin{small}
+\begin{verbatim}
+conda env create -f environment.yml
+conda activate vision-agent
+python main.py
+\end{verbatim}
+\end{small}
+\noindent
+and the agent then runs on local images or the webcam.
+
+\paragraph{Practical limits.}
+The API model is a black box that can change between versions, and its
+answers are not deterministic. Routing decisions should therefore be
+constrained, e.g.\ by asking for exactly one of a fixed set of labels and
+falling back to a default otherwise. Every call costs money and time, and
+images consume many input tokens (compare the worked example on sequence
+length above), so large batches should be sent at reduced resolution when
+the task allows. Finally, images sent to an external service leave the local
+machine, which matters for private family photos or confidential documents.
+
+\subsection{Trained Integration Versus API Composition}
+
+PaLM-E and the visual task agent answer the grounding problem at different
+levels. PaLM-E changes the model: observations become part of the LLM input,
+and training teaches the model to reason about them and to plan actions. The
+agent keeps the model fixed and changes the program around it: a graph
+decides which question to ask and which tool to call.
+Table~\ref{tab:mllm-compare} contrasts the two.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.2cm}p{5.3cm}p{5.3cm}@{}}
+    \toprule
+    Aspect & Embodied multimodal LLM (PaLM-E) & LLM via API (visual agent) \\
+    \midrule
+    Where images enter & encoder $\phi$, vectors in the embedding space &
+      image part of a user message; encoding hidden \\
+    What is trained & encoder, projection, optionally the LLM & nothing;
+      behavior set by prompts and graph \\
+    Output & text: answers, captions, robot plans & text, plus results of
+      tool calls \\
+    Control flow & learned, inside the model (closed-loop replanning) &
+      explicit graph with nodes and conditional edges \\
+    Requirements & large compute, multimodal and robot data & API key,
+      budget, network access \\
+    Typical use & research, robotics, generalist models & applications
+      built quickly from existing models \\
+    \bottomrule
+  \end{tabular}
+  \caption{Two ways to connect language models with images. Trained
+  integration grounds the model itself; API composition grounds an
+  application built around a fixed model.}
+  \label{tab:mllm-compare}
+\end{table}
+
+\noindent
+Both views share the same core mechanism. An image is turned into a set of
+vectors, those vectors join the text tokens in one sequence, and a
+decoder-only transformer continues that sequence with text. Everything
+else, whether the text is a VQA answer, a robot plan, or a routing label,
+depends on the prompt and on what the text is used for afterwards. Image
+\emph{captioning}, one of the basic computer vision tasks, is the simplest
+instance: the prefix is an image and ``Describe the image,'' and the
+continuation is the caption.
