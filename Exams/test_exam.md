@@ -21,7 +21,14 @@ This system is an example application of the general computer vision task of:
 
 Bring the steps of the **Classical Computer Vision Pipeline** into the correct order.
 
-> **Note:** The six draggable steps are not contained in the text export.
+Steps (shown in this shuffled order):
+
+* Data Preprocessing
+* Feature Selection
+* Feature Extraction
+* Feature Preprocessing
+* Post processing
+* Classifier
 
 ---
 
@@ -338,7 +345,7 @@ What is the result of an increased number of filters in a convolutional layer of
 
 **1 point**
 
-What are effects of **max-pooling layers** in Convolutional Neural Networks?
+What are effects of **(max-)pooling layers** in Convolutional Neural Networks?
 
 * [ ] **a.** Dimensionality reduction
 * [ ] **b.** Translation invariance
@@ -411,6 +418,8 @@ Given are four image patches.
 
 Drag and drop the matching **intensity histograms** and **entropy values** to the correct image patch.
 
+The task has two steps: first assign the four histogram plots to the images, then assign the four entropy values to the columns. There are 8 placements in total, each worth 0.25 points.
+
 Available items:
 
 * Histogram a
@@ -422,7 +431,21 @@ Available items:
 * Entropy c
 * Entropy d
 
-> **Note:** The image patches, histograms, and entropy values are missing from the text export.
+Image patches (binary, black and white):
+
+* **a:** completely white
+* **b:** white with a small black disk in the center
+* **c:** 2×2 checkerboard (two white and two black quadrants)
+* **d:** one white quadrant (top left), three black quadrants
+
+Histograms (x-axis from black to white):
+
+* one single bar (white)
+* small black bar, large white bar
+* two equal bars
+* large black bar, small white bar
+
+Entropy values: `0`, `0.8`, `1`, `0.8`
 
 ---
 
@@ -524,7 +547,13 @@ $$
 h_0=0.
 $$
 
-> **Note:** The RNN diagram is missing from the text export.
+RNN diagram: a single cell computes
+
+$$
+h_t = a\,h_{t-1} + a\,x_t,
+$$
+
+takes input \(x_t\) from below, feeds its state \(h_t\) back into itself as \(h_{t-1}\) of the next step, and emits \(h_t\) as output.
 
 **Answer:** __________
 
@@ -676,7 +705,7 @@ For each of the following statements about **Generative Adversarial Networks (GA
 
 | Statement                                                                                                                                    | True | False |
 | -------------------------------------------------------------------------------------------------------------------------------------------- | :--: | :---: |
-| The generator network learns the empirical probability function of the dataset.                                                              |  [ ] |  [ ]  |
+| The generator network learns the (empirical) probability function of the dataset.                                                            |  [ ] |  [ ]  |
 | All GANs require a labeled dataset, i.e. a dataset consisting of tuples \((x,y)\), where \(x\) is the input and \(y\) is the desired output. |  [ ] |  [ ]  |
 | CycleGANs train two generators and two discriminator networks simultaneously.                                                                |  [ ] |  [ ]  |
 | The computation of backpropagation for the generator network is independent of the discriminator.                                            |  [ ] |  [ ]  |

@@ -670,6 +670,11 @@ leading $s$ making the measure comparable across scales; the final saliency
 $y(s_p,x)$ is the product, so a location scores highly only when it is both
 complex (high $H_D$) and tied to a distinctive scale (high $W_D$). This is exactly
 what suppresses featureless noise, whose entropy is high but flat across scale.
+The same holds for a regular texture such as a checkerboard: it has the highest
+entropy of a binary patch, but larger windows keep showing the same black/white
+ratio, so there is no peak. A single dark blob on a bright background has lower
+entropy, yet its histogram changes sharply once the window grows past the blob,
+so the blob is the more salient region.
 Figure~\ref{fig:saliency-scale} shows the entropy-versus-scale curve with its
 peak, alongside the flat-versus-peaked histogram intuition.
 

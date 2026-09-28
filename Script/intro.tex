@@ -424,16 +424,18 @@ gives one example per stage.
     \node[stage, fill=gray!10] (acq) {image\\acquisition};
     \node[stage, fill=blue!8, right=of acq] (pre) {data\\preprocessing};
     \node[stage, fill=green!8, right=of pre] (fe) {feature\\extraction};
-    \node[stage, fill=green!8, right=of fe] (fp) {feature\\preprocessing};
+    \node[stage, fill=green!8, right=of fe] (fs) {feature\\selection};
+    \node[stage, fill=green!8, right=of fs] (fp) {feature\\preprocessing};
     \node[stage, fill=orange!12, right=of fp] (cl) {classification};
     \node[stage, fill=red!8, right=of cl] (post) {post-\\processing};
     \draw[arrow] (acq) -- (pre);
     \draw[arrow] (pre) -- (fe);
-    \draw[arrow] (fe) -- (fp);
+    \draw[arrow] (fe) -- (fs);
+    \draw[arrow] (fs) -- (fp);
     \draw[arrow] (fp) -- (cl);
     \draw[arrow] (cl) -- (post);
     \node[font=\small, below=0.25cm of pre] {pixel space};
-    \node[font=\small, below=0.25cm of fp] {feature space};
+    \node[font=\small, below=0.25cm of fs] {feature space};
     \node[font=\small, below=0.25cm of post] {output space};
   \end{tikzpicture}%
   }
@@ -454,8 +456,10 @@ gives one example per stage.
       equalization to remove illumination differences \\
     Feature extraction & image $\rightarrow$ feature vector & intensity
       histogram, HOG, bag of visual words \\
+    Feature selection & features $\rightarrow$ fewer features & keep only the
+      informative dimensions \\
     Feature preprocessing & features $\rightarrow$ features & normalization,
-      feature selection, dimensionality reduction \\
+      whitening, dimensionality reduction \\
     Classification & features $\rightarrow$ label & linear classifier, SVM,
       random forest, MLP \\
     Postprocessing & labels $\rightarrow$ labels & smoothing label maps,

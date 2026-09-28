@@ -388,7 +388,9 @@ $224\times224\times64$ output would need about $150{,}528\cdot3.2\cdot10^6
 magnitude is the whole point of convolution.
 
 Channels widen what a layer computes at one position; depth widens how much of
-the input a unit sees. A hidden unit in the first layer sees $K$ inputs. A unit in the second layer sees
+the input a unit sees. More filters in one layer therefore raise its output
+dimensionality and the number of distinct features it can respond to, but they
+do not make those features more abstract; abstraction grows with depth. A hidden unit in the first layer sees $K$ inputs. A unit in the second layer sees
 $K$ units of the first layer, each of which sees $K$ inputs, so the region of
 the input that can influence it has grown. The \emph{receptive field} of a unit is
 this region: the set of input positions that can change its value.
@@ -536,7 +538,8 @@ of a feature map:
         is equivalent to a convolution with stride $2$;
   \item \emph{max pooling}: keep the maximum of each $2\times2$ block; small
         shifts of a feature inside a block do not change the result, which gives
-        partial invariance to translation;
+        partial invariance to translation (not equivariance, which comes from
+        the convolution itself) at the price of losing the exact position;
   \item \emph{mean pooling}: keep the average of each $2\times2$ block.
 \end{itemize}
 \noindent
