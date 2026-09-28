@@ -1,0 +1,735 @@
+\section{Diffusion Models}
+\label{sec:diffusion}
+
+A GAN turns random numbers into an image in a single pass of its generator and
+learns this mapping through an adversarial game. A diffusion model reaches the
+same goal on a very different path. It first destroys images on purpose: over
+many small steps, it mixes a training image with Gaussian noise until nothing
+but noise is left. This destruction needs no learning at all. A neural network
+then learns to undo one small step at a time. To generate a new image, one
+starts from pure noise and applies the learned denoising step again and again
+until a clean image appears. Each individual step is an easy regression
+problem with a known target, so training is as stable as ordinary supervised
+learning. This section derives the forward noising process, the noise
+prediction objective, and the reverse sampling procedure, then shows how
+Stable Diffusion runs the process in a compressed latent space conditioned on
+text, and how low-rank adaptation (LoRA) fine-tunes such a large model on a
+small image set.
+
+\subsection{Destroying and Recreating Images}
+
+Figure~\ref{fig:diff-chain} shows the two directions. The \emph{forward} or
+\emph{diffusion process} maps the input image $x_0$ through a chain of latent
+variables $x_1,x_2,\dots,x_T$. Each step adds a little noise, and after
+$T$ steps (typically $T=1000$) the image $x_T$ is indistinguishable from a
+sample of a standard normal distribution. In the language of the latent
+variable models of Section~\ref{sec:gan}, this chain acts as an
+\emph{encoder}, but a fixed one without parameters. The \emph{reverse process}
+is the decoder. It passes the data back through the same latent variables and
+removes noise at each step. Only the reverse process is learned.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    img/.style={draw, minimum size=1.3cm, inner sep=0pt},
+    fwd/.style={-{Latex[length=2mm]}, thick},
+    rev/.style={-{Latex[length=2mm]}, thick, orange!80!black},
+    lbl/.style={font=\footnotesize, align=center}
+  ]
+    \pgfmathsetseed{7}
+    \foreach \i/\x/\n in {0/0/0, 1/2.3/25, 2/4.6/70, 3/8.4/260} {
+      \node[img] (x\i) at (\x,0) {};
+      \ifnum\i<3
+        \fill[blue!45] (\x,0.05) circle (0.33);
+        \fill[blue!45] (\x-0.4,-0.55) rectangle (\x+0.4,-0.3);
+      \fi
+      \ifnum\n>0
+        \foreach \k in {1,...,\n} {
+          \fill[black!70] ($(\x,0)+(rnd*1.2-0.6, rnd*1.2-0.6)$) circle (0.025);
+        }
+      \fi
+    }
+    \node at (6.5,0) {$\cdots$};
+    \node[lbl, below=0.1cm of x0] {$x_0$\\ clean image};
+    \node[lbl, below=0.1cm of x1] {$x_1$};
+    \node[lbl, below=0.1cm of x2] {$x_2$};
+    \node[lbl, below=0.1cm of x3] {$x_T$\\ $\approx\mathcal N(0,I)$};
+    \draw[fwd] ($(x0.north)+(0.2,0.15)$) to[bend left=30]
+      node[lbl, above] {$q(x_1\mid x_0)$} ($(x1.north)+(-0.2,0.15)$);
+    \draw[fwd] ($(x1.north)+(0.2,0.15)$) to[bend left=30]
+      node[lbl, above] {$q(x_2\mid x_1)$} ($(x2.north)+(-0.2,0.15)$);
+    \draw[fwd] ($(x2.north)+(0.2,0.15)$) to[bend left=20]
+      node[lbl, above] {fixed noising} ($(x3.north)+(-0.2,0.15)$);
+    \draw[rev] ($(x3.south)+(-0.2,-0.75)$) to[bend left=20]
+      node[lbl, below] {learned denoising} ($(x2.south)+(0.2,-0.75)$);
+    \draw[rev] ($(x2.south)+(-0.2,-0.75)$) to[bend left=30]
+      node[lbl, below] {$p_\theta(x_1\mid x_2)$} ($(x1.south)+(0.2,-0.75)$);
+    \draw[rev] ($(x1.south)+(-0.2,-0.75)$) to[bend left=30]
+      node[lbl, below] {$p_\theta(x_0\mid x_1)$} ($(x0.south)+(0.2,-0.75)$);
+  \end{tikzpicture}
+  \caption{Diffusion model. The forward process (black, top) adds a little
+  Gaussian noise per step until the image is pure noise $x_T$. The reverse
+  process (orange, bottom) is a learned network that removes noise step by
+  step and so turns a noise sample into an image.}
+  \label{fig:diff-chain}
+\end{figure}
+
+\noindent
+Why go through a thousand small steps instead of mapping noise to an image in
+one pass, as a GAN does? A single jump from noise to a realistic image is a
+hard, highly ambiguous mapping. A small denoising step, in contrast, only has
+to make a slightly noisy image a little cleaner. Because every step adds only
+a small amount of noise, the reverse of a step is well approximated by a
+Gaussian, and a network can predict it with a plain squared-error loss. There
+is no discriminator, no minimax game, and no mode collapse: every training
+image is noised and must be reconstructed, so the model is pushed to cover the
+whole data distribution. Diffusion models belong to the probabilistic
+generative models of Figure~\ref{fig:gen-taxonomy}. Their training objective
+is a simplified bound on the likelihood, so, like a VAE, they learn an
+approximation of the data distribution. Table~\ref{tab:diff-vs-gan-vae}
+compares the three families. The price for stable training is slow sampling:
+generating one image requires many network evaluations instead of one.
+
+\subsection{The Forward Noising Process}
+
+Let $\mathcal D=\{x_0^{(1)},\dots,x_0^{(N)}\}$ be the training images. The
+forward process is controlled by a \emph{noise schedule}, a fixed sequence of
+small variances
+\begin{equation}
+  0<\beta_1<\dots<\beta_T<1,\qquad
+  \alpha_t = 1-\beta_t,\qquad
+  \bar\alpha_t = \prod_{s=1}^{t}\alpha_s .
+  \label{eq:diff-schedule}
+\end{equation}
+\noindent
+A common choice is a linear schedule from $\beta_1=10^{-4}$ to
+$\beta_T=0.02$ with $T=1000$. One forward step shrinks the current image a
+little and adds fresh Gaussian noise of variance $\beta_t$:
+\begin{equation}
+  q(x_t\mid x_{t-1}) = \mathcal N\!\left(x_t;\ \sqrt{\alpha_t}\,x_{t-1},\
+  \beta_t I\right),
+  \qquad\text{i.e.}\qquad
+  x_t = \sqrt{1-\beta_t}\,x_{t-1} + \sqrt{\beta_t}\,\varepsilon_t .
+  \label{eq:diff-step}
+\end{equation}
+\noindent
+The shrinking factor $\sqrt{1-\beta_t}$ is chosen so that the variance stays
+constant. If $x_{t-1}$ has unit variance per pixel, then $x_t$ has variance
+$(1-\beta_t)+\beta_t=1$. Without shrinking, the variance would grow with every
+step, and the end point would not be a standard normal distribution.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.6cm}p{3.6cm}p{3.6cm}p{3.9cm}@{}}
+    \toprule
+    & GAN & VAE & Diffusion model \\
+    \midrule
+    Latent space & low-dim.\ $z$ & low-dim.\ $z$ & same size as image,
+      $T$ copies \\
+    Encoder & none & learned & fixed noising, no parameters \\
+    Training & adversarial minimax & likelihood bound & likelihood bound,
+      reduced to MSE on noise \\
+    Stability & fragile, mode collapse & stable & stable \\
+    Density & no & approximate & approximate \\
+    Sample quality & sharp & often blurry & sharp, state of the art \\
+    Sampling cost & one pass & one pass & many passes ($T$ or ${\approx}50$) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Three families of generative models. Diffusion models combine the
+  stable likelihood-based training of VAEs with the sample quality of GANs,
+  but pay with many network evaluations per sample.}
+  \label{tab:diff-vs-gan-vae}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[x=10cm, y=2.6cm,
+    lbl/.style={font=\footnotesize, align=left}]
+    \draw[-{Latex[length=2mm]}] (0,0) -- (1.06,0) node[right, font=\small] {$t$};
+    \draw[-{Latex[length=2mm]}] (0,0) -- (0,1.12);
+    \foreach \u/\t in {0/0, 0.25/250, 0.5/500, 0.75/750, 1/1000} {
+      \draw (\u,0) -- (\u,-0.03) node[below, font=\footnotesize] {\t};
+    }
+    \foreach \v in {0, 0.5, 1} {
+      \draw (0,\v) -- (-0.01,\v) node[left, font=\footnotesize] {\v};
+    }
+    % linear schedule: ln abar(u) ~ -(0.1 u + 9.95 u^2), u = t/T
+    \draw[thick, blue!70!black, domain=0:1, samples=80]
+      plot (\x, {exp(-(0.1*\x + 9.95*\x*\x)/2)});
+    \draw[thick, blue!70!black, dashed, domain=0:1, samples=80]
+      plot (\x, {sqrt(1 - exp(-(0.1*\x + 9.95*\x*\x)))});
+    % cosine schedule: abar(u) = cos^2((u+s)/(1+s)*90deg) / cos^2(s/(1+s)*90deg)
+    \draw[thick, orange!85!black, domain=0:1, samples=80]
+      plot (\x, {cos((\x+0.008)/1.008*90)/cos(0.008/1.008*90)});
+    \node[lbl, blue!70!black] at (0.27,0.40) {$\sqrt{\bar\alpha_t}$, linear};
+    \node[lbl, blue!70!black] at (0.85,0.88) {$\sqrt{1-\bar\alpha_t}$, linear};
+    \node[lbl, orange!85!black] at (0.73,0.62) {$\sqrt{\bar\alpha_t}$, cosine};
+  \end{tikzpicture}
+  \caption{Signal coefficient $\sqrt{\bar\alpha_t}$ (solid) and noise
+  coefficient $\sqrt{1-\bar\alpha_t}$ (dashed) for the linear schedule with
+  $T=1000$, and the signal coefficient of the cosine schedule (orange). The
+  linear schedule destroys the image early and wastes many late steps on
+  almost pure noise; the cosine schedule spreads the destruction more
+  evenly.}
+  \label{fig:diff-schedule}
+\end{figure}
+
+\paragraph{Closed form for any time step.}
+Running a thousand steps to produce one training example would be wasteful.
+Fortunately, a sum of independent Gaussians is again Gaussian, so the chain
+collapses. Two steps give
+\begin{equation*}
+  x_t = \sqrt{\alpha_t}\bigl(\sqrt{\alpha_{t-1}}\,x_{t-2}
+      + \sqrt{\beta_{t-1}}\,\varepsilon_{t-1}\bigr) + \sqrt{\beta_t}\,\varepsilon_t
+      = \sqrt{\alpha_t\alpha_{t-1}}\,x_{t-2}
+      + \sqrt{\alpha_t\beta_{t-1}}\,\varepsilon_{t-1}
+      + \sqrt{\beta_t}\,\varepsilon_t .
+\end{equation*}
+\noindent
+The two noise terms are independent, so their sum is one Gaussian with
+variance $\alpha_t(1-\alpha_{t-1})+(1-\alpha_t)=1-\alpha_t\alpha_{t-1}$. The
+two steps thus act like a single step with signal factor
+$\sqrt{\alpha_t\alpha_{t-1}}$. By induction over all steps back to $x_0$,
+\begin{equation}
+  x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon,
+  \qquad \varepsilon\sim\mathcal N(0,I),
+  \qquad\text{i.e.}\qquad
+  q(x_t\mid x_0)=\mathcal N\!\left(x_t;\ \sqrt{\bar\alpha_t}\,x_0,\
+  (1-\bar\alpha_t)I\right).
+  \label{eq:diff-marginal}
+\end{equation}
+\noindent
+This is the key result of the forward process: any noise level $x_t$ can be
+sampled directly from $x_0$ with one Gaussian draw. The tensor $\varepsilon$
+has the same shape as the image, with one independent Gaussian value per pixel
+and channel. It is a \emph{concrete sampled noise tensor}, not an abstract
+distribution. The two coefficients split the image into a signal part and a
+noise part whose squares always sum to one. The \emph{signal-to-noise ratio}
+$\bar\alpha_t/(1-\bar\alpha_t)$ falls monotonically from very large at $t=1$
+to almost zero at $t=T$.
+
+\paragraph{Worked example.}
+Take one pixel with value $x_0=0.8$ at a time step with $\bar\alpha_t=0.64$,
+and suppose the sampled noise is $\varepsilon=-0.5$. Then
+$x_t=\sqrt{0.64}\cdot0.8+\sqrt{0.36}\cdot(-0.5)=0.64-0.30=0.34$. For the
+linear schedule, $\ln\bar\alpha_T=\sum_t\ln(1-\beta_t)\approx-\sum_t\beta_t$.
+The sum of the $1000$ linearly spaced values is
+$1000\cdot(10^{-4}+0.02)/2\approx10.05$, so $\bar\alpha_T\approx e^{-10}
+\approx4.5\cdot10^{-5}$ and the image coefficient $\sqrt{\bar\alpha_T}$ is
+below $0.007$. At the end of the chain almost nothing of $x_0$ survives, and
+$q(x_T\mid x_0)\approx\mathcal N(0,I)$ regardless of the input image. This is
+exactly the distribution from which generation will start.
+
+\paragraph{Choice of schedule.}
+Figure~\ref{fig:diff-schedule} shows that the linear schedule removes most of
+the image within the first half of the chain. The \emph{cosine schedule}
+defines $\bar\alpha_t$ directly,
+$\bar\alpha_t = f(t)/f(0)$ with $f(t)=\cos^2\!\bigl(\tfrac{t/T+s}{1+s}
+\cdot\tfrac{\pi}{2}\bigr)$ and a small offset $s=0.008$. It changes slowly near
+$t=0$ and $t=T$ and gives better image quality at both ends. More recent
+schedules (sigmoid, EDM) are tuned for fast sampling. Whatever the schedule,
+it is fixed before training and is not learned.
+
+\subsection{Training a Network to Predict the Noise}
+
+Solving Equation~\ref{eq:diff-marginal} for the noise gives the training
+target:
+\begin{equation}
+  \varepsilon = \frac{x_t-\sqrt{\bar\alpha_t}\,x_0}{\sqrt{1-\bar\alpha_t}} .
+  \label{eq:diff-eps-target}
+\end{equation}
+\noindent
+This is the normalized Gaussian noise component that corrupted $x_0$ into
+$x_t$. In the worked example, $(0.34-0.64)/0.6=-0.5$ recovers the sampled
+value. During training this ground truth is known exactly, because we sampled
+$\varepsilon$ ourselves when constructing $x_t$. A neural network
+$\varepsilon_\theta(x_t,t)$ receives the noisy image and the time step and
+predicts the noise; its loss is the mean squared error
+\begin{equation}
+  \mathcal L(\theta) = \mathbb E_{x_0,\,t,\,\varepsilon}\Bigl[
+  \bigl\|\varepsilon-\varepsilon_\theta\bigl(\sqrt{\bar\alpha_t}\,x_0
+  +\sqrt{1-\bar\alpha_t}\,\varepsilon,\ t\bigr)\bigr\|^2\Bigr].
+  \label{eq:diff-loss}
+\end{equation}
+\noindent
+The expectation runs over training images, uniformly drawn time steps
+$t\in\{1,\dots,T\}$, and noise samples. The full derivation starts from a
+bound on the likelihood, as in Equation~\ref{eq:gen-nll}, and contains a
+different weight for each $t$. Dropping these weights gives this
+\emph{simplified loss}, which works better in practice. One network with
+shared parameters $\theta$ serves all noise levels, so it must be
+\emph{time-conditioned}. Figure~\ref{fig:diff-train} shows one training step.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, minimum height=0.9cm,
+      align=center, font=\small},
+    link/.style={-{Latex[length=2mm]}, thick},
+    lbl/.style={font=\footnotesize, align=center}
+  ]
+    \node[box] (x0) at (0,0.8) {image $x_0$};
+    \node[box] (eps) at (0,-0.8) {noise $\varepsilon$};
+    \node[box] (t) at (4.8,2.0) {step $t$};
+    \node[box, fill=gray!15] (mix) at (3.2,0)
+      {$\sqrt{\bar\alpha_t}\,x_0$\\ $+\sqrt{1-\bar\alpha_t}\,\varepsilon$};
+    \node[box, fill=orange!25, minimum width=2.2cm] (net) at (6.6,0)
+      {U-Net\\ $\varepsilon_\theta(x_t,t)$};
+    \node[box, fill=gray!15] (loss) at (10.2,0)
+      {$\|\varepsilon-\hat\varepsilon\|^2$};
+    \draw[link] (x0) -- (mix);
+    \draw[link] (eps) -- (mix);
+    \draw[link] (mix) -- node[lbl, above] {$x_t$} (net);
+    \draw[link] (net) -- node[lbl, above] {$\hat\varepsilon$} (loss);
+    \draw[link] (t.west) -| (mix.north);
+    \draw[link] (t.east) -| (net.north);
+    \draw[link] (eps.south) -- ++(0,-0.6) -| node[lbl, pos=0.25, below]
+      {known target} (loss.south);
+  \end{tikzpicture}
+  \caption{One training step. A clean image, a noise tensor, and a time step
+  are drawn; the mixture $x_t$ goes into the network, and its noise estimate
+  $\hat\varepsilon$ is compared with the noise that was actually added.}
+  \label{fig:diff-train}
+\end{figure}
+
+\noindent
+Training thus repeats a short loop:
+\begin{enumerate}
+  \item draw a training image $x_0\sim\mathcal D$;
+  \item draw a time step $t\sim\operatorname{Uniform}\{1,\dots,T\}$;
+  \item draw noise $\varepsilon\sim\mathcal N(0,I)$;
+  \item form $x_t=\sqrt{\bar\alpha_t}\,x_0+\sqrt{1-\bar\alpha_t}\,\varepsilon$;
+  \item compute $\ell=\|\varepsilon-\varepsilon_\theta(x_t,t)\|^2$ and take a
+    gradient step on $\theta$.
+\end{enumerate}
+\noindent
+The chain is never run step by step during training. Every example is an
+independent regression problem with input $(x_t,t)$ and target
+$\varepsilon$.
+
+\paragraph{What the network actually learns.}
+The network cannot know the exact noise that was drawn. Many clean images
+$x_0$, each combined with a suitable noise tensor, lead to the same noisy image
+$x_t$, and at high noise levels a blurry blob is compatible with a cat, a dog,
+or a car. For squared error, the best possible prediction is the conditional
+mean $\varepsilon_\theta(x_t,t)=\mathbb E[\varepsilon\mid x_t]$, averaged
+over all clean images that could have produced $x_t$ under the training
+distribution. The network therefore does not memorize an inverse of the
+corruption. It learns the statistically best \emph{denoising direction}: the
+direction in which $x_t$ must move to become more like a natural image. In
+other words, it learns the structure of natural images. This has a precise
+counterpart. For the Gaussian of Equation~\ref{eq:diff-marginal},
+\begin{equation}
+  \nabla_{x_t}\log q(x_t\mid x_0)
+  = -\frac{x_t-\sqrt{\bar\alpha_t}\,x_0}{1-\bar\alpha_t}
+  = -\frac{\varepsilon}{\sqrt{1-\bar\alpha_t}},
+  \label{eq:diff-score}
+\end{equation}
+\noindent
+so predicting the noise is, up to a scale factor, the same as learning the
+\emph{score}, the gradient of the log density at each noise level. The score
+points uphill in probability, toward regions where natural images lie. This
+links diffusion models to score-based generative models. Because $x_t$ and
+$\hat\varepsilon$ determine each other, a noise prediction can also be turned
+into an estimate of the clean image,
+\begin{equation}
+  \hat x_0 = \frac{x_t-\sqrt{1-\bar\alpha_t}\,\varepsilon_\theta(x_t,t)}
+  {\sqrt{\bar\alpha_t}} ,
+  \label{eq:diff-x0-hat}
+\end{equation}
+\noindent
+which at large $t$ is a blurry average of plausible images and at small $t$
+is sharp.
+
+\paragraph{The U-Net backbone.}
+The noise prediction has the same size as the input, and it must be accurate
+both in fine detail and in global layout. The U-Net of
+Figure~\ref{fig:unet} meets both requirements, and it is the standard
+denoising network. The diffusion U-Net modifies the segmentation U-Net in a
+few places. Its encoder consists of residual blocks with spatial
+downsampling, for example from $64\times64$ over $32\times32$ and
+$16\times16$ down to $8\times8$. At the low resolutions ($16\times16$,
+$8\times8$), self-attention layers (Section~\ref{sec:transformers}) capture
+global context at moderate cost, since the number of attention pairs grows
+with the square of the number of positions. The decoder upsamples and
+receives skip connections from the encoder. The time step $t$ is encoded with
+sinusoidal features, as in the positional encoding of
+Equation~\ref{eq:transformer-position}, passed through a small MLP, and added
+to the feature maps of every residual block. The same weights therefore
+behave differently at different noise levels: at large $t$ they sketch
+coarse layout, at small $t$ they refine texture.
+
+\subsection{Generating Images by Reverse Denoising}
+
+To generate a new image, start from pure Gaussian noise, $x_T\sim\mathcal
+N(0,I)$, and apply learned reverse steps
+$x_T\to x_{T-1}\to\dots\to x_0$. The true reverse distribution
+$q(x_{t-1}\mid x_t)$ is intractable, because it depends on the unknown data
+distribution. Since each forward step adds only little noise, it is
+approximated by a Gaussian $p_\theta(x_{t-1}\mid x_t)=\mathcal
+N(x_{t-1};\mu_\theta(x_t,t),\sigma_t^2I)$, whose mean is computed from the
+noise prediction:
+\begin{equation}
+  x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t
+  - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\varepsilon_\theta(x_t,t)\right)
+  + \sigma_t z,
+  \qquad z\sim\mathcal N(0,I).
+  \label{eq:diff-reverse}
+\end{equation}
+\noindent
+Read from the inside out, each step does four things: look at the current
+noisy image $x_t$, ask the network to estimate the noise component, subtract
+the fraction $\beta_t/\sqrt{1-\bar\alpha_t}$ of that noise, and undo the
+shrinking of the forward step with the factor $1/\sqrt{\alpha_t}$. Only a
+part of the predicted noise is removed per step, because the network's
+estimate is unreliable at high noise; the next step looks again with a better
+view. The added term $\sigma_t z$ with fresh noise, usually
+$\sigma_t^2=\beta_t$, keeps the process stochastic. It corresponds to
+sampling from $p_\theta$ instead of taking its mean, and it lets different
+runs from the same start produce different details. At the last step no noise
+is added ($z=0$ for $t=1$), and $x_0$ is returned.
+
+\paragraph{Sanity check at $t=1$.}
+At the first step $\bar\alpha_1=\alpha_1=1-\beta_1$, so the coefficient in
+Equation~\ref{eq:diff-reverse} becomes
+$\beta_1/\sqrt{\beta_1}=\sqrt{\beta_1}$, and without the noise term
+$x_0=(x_1-\sqrt{\beta_1}\,\varepsilon_\theta)/\sqrt{\alpha_1}$. This is the
+exact inverse of the forward step $x_1=\sqrt{\alpha_1}\,x_0+\sqrt{\beta_1}\,
+\varepsilon$ of Equation~\ref{eq:diff-step}. If the network predicted the
+noise perfectly, the last step would restore the image exactly. For larger
+$t$ the formula removes only the share of the total noise that belongs to one
+step.
+
+\paragraph{Sampling cost and DDIM.}
+Equation~\ref{eq:diff-reverse} must be applied $T=1000$ times, and every
+application is a full U-Net forward pass, a \emph{network function
+evaluation} (NFE). A GAN needs one. Denoising diffusion implicit models
+(DDIM) reduce this cost without retraining. They first estimate the clean
+image with Equation~\ref{eq:diff-x0-hat} and then re-noise it
+deterministically to a lower noise level, reusing the predicted noise
+direction:
+\begin{equation}
+  x_{t'} = \sqrt{\bar\alpha_{t'}}\,\hat x_0
+  + \sqrt{1-\bar\alpha_{t'}}\;\varepsilon_\theta(x_t,t),
+  \qquad t'<t.
+  \label{eq:diff-ddim}
+\end{equation}
+\noindent
+Since no fresh noise enters, the jump from $t$ to $t'$ need not be a single
+step. A subsequence of about $50$ time steps gives images of similar quality
+to the full $1000$-step chain. The same start noise $x_T$ always yields the
+same image, which makes DDIM sampling reproducible.
+Table~\ref{tab:diff-train-vs-sample} summarizes training and generation.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.5cm}p{5.6cm}p{5.6cm}@{}}
+    \toprule
+    & Training & Generation \\
+    \midrule
+    Start & training image $x_0$ & $x_T\sim\mathcal N(0,I)$ \\
+    Noise & sampled $\varepsilon$, known & unknown, estimated by
+      $\varepsilon_\theta$ \\
+    Time steps & one random $t$ per example & all $t=T,\dots,1$ (DDIM: ${\approx}50$) \\
+    Network use & one forward and backward pass & one forward pass per step \\
+    Formula & Eq.~\ref{eq:diff-marginal}, loss Eq.~\ref{eq:diff-loss} &
+      Eq.~\ref{eq:diff-reverse} or Eq.~\ref{eq:diff-ddim} \\
+    Result & $\varepsilon_\theta(x_t,t)\approx\varepsilon$ & new image $x_0$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Training versus generation. Training jumps directly to a random
+  noise level; generation must walk the whole chain back.}
+  \label{tab:diff-train-vs-sample}
+\end{table}
+
+\noindent
+In one sentence: the trained object is the network $\varepsilon_\theta$ that
+predicts, for every noise level $t$, the noise tensor that should be removed to
+move a sample back toward the learned image distribution.
+
+\subsection{Latent Diffusion and Stable Diffusion}
+
+A diffusion model working directly on pixels is expensive. A U-Net must
+process a $512\times512\times3$ tensor at every one of many steps, both in
+training and in generation. Most of these pixel values encode fine detail that
+a good autoencoder can reproduce from a much smaller code. \emph{Latent
+diffusion models} (LDM) therefore separate the problem into two stages.
+
+In the first stage, a variational autoencoder with encoder $\mathcal E$ and
+decoder $\mathcal D$ is trained to compress and reconstruct images:
+$z=\mathcal E(x)\in\mathbb R^{h\times w\times c}$ and
+$\tilde x=\mathcal D(z)$. A typical downsampling factor $f=8$ turns
+$512\times512\times3$ into $64\times64\times4$. The latent has $64$ times
+fewer spatial positions and $48$ times fewer values, yet the reconstruction
+is nearly lossless for human perception. In the second stage, the diffusion
+process of the previous subsections runs entirely in this latent space. The
+loss is Equation~\ref{eq:diff-loss} with $z$ in place of $x$,
+\begin{equation}
+  \mathcal L_{\mathrm{LDM}} = \mathbb E_{z,\,\varepsilon,\,t}\Bigl[
+  \bigl\|\varepsilon-\varepsilon_\theta(z_t,t,\tau_\theta(y))\bigr\|^2\Bigr],
+  \qquad z=\mathcal E(x),
+  \label{eq:diff-ldm}
+\end{equation}
+\noindent
+where $\tau_\theta(y)$ encodes a condition $y$ such as a text prompt. The
+work is thus divided: the VAE performs the actual compression and
+decompression, and the U-Net performs multiscale noise prediction on small
+tensors. Stable Diffusion is such a latent diffusion model for text-to-image
+generation.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, minimum height=0.85cm,
+      align=center, font=\small},
+    link/.style={-{Latex[length=2mm]}, thick},
+    lbl/.style={font=\footnotesize, align=center},
+    region/.style={draw, rounded corners=6pt, thick}
+  ]
+    \fill[red!6] (-0.9,-2.9) rectangle (1.3,1.35);
+    \draw[region] (-0.9,-2.9) rectangle (1.3,1.35);
+    \node[lbl, anchor=south] at (0.2,-2.85) {pixel space};
+    \fill[green!6] (1.6,-2.9) rectangle (10.3,1.35);
+    \draw[region] (1.6,-2.9) rectangle (10.3,1.35);
+    \node[lbl, anchor=south] at (6.0,-2.85) {latent space};
+    \fill[gray!8] (10.6,-2.9) rectangle (13.9,1.35);
+    \draw[region] (10.6,-2.9) rectangle (13.9,1.35);
+    \node[lbl, anchor=south] at (12.25,-2.85) {conditioning};
+
+    \node[box] (x) at (0.2,0.6) {$x$};
+    \node[box, fill=blue!12] (enc) at (2.5,0.6) {$\mathcal E$};
+    \node[box] (z) at (4.3,0.6) {$z$};
+    \node[box] (zT) at (8.9,0.6) {$z_T$};
+    \draw[link] (x) -- (enc);
+    \draw[link] (enc) -- (z);
+    \draw[link] (z) -- node[lbl, above] {diffusion process (fixed)} (zT);
+
+    \node[box, fill=orange!25, minimum width=3.2cm] (unet) at (6.6,-1.3)
+      {denoising U-Net $\varepsilon_\theta$\\ with cross-attention};
+    \node[box] (z0) at (2.5,-1.3) {$z_0$};
+    \node[box, fill=blue!12] (dec) at (0.2,-0.6) {$\mathcal D$};
+    \node[box] (xt) at (0.2,-1.9) {$\tilde x$};
+    \draw[link] (zT.south) -- ++(0,-0.6) -| ($(unet.north)+(1.0,0)$);
+    \draw[link] (unet) -- node[lbl, above] {$\times T$ steps} (z0);
+    \draw[link] (z0.north) |- (dec.east);
+    \draw[link] (dec) -- (xt);
+
+    \node[box] (y) at (12.25,0.6) {prompt $y$};
+    \node[box, fill=blue!12] (tau) at (12.25,-1.3) {text encoder\\ $\tau_\theta$};
+    \draw[link] (y) -- (tau);
+    \draw[link] (tau) -- node[lbl, above] {$K,V$} (unet);
+  \end{tikzpicture}
+  \caption{Stable Diffusion. The VAE encoder $\mathcal E$ maps an image into
+  latent space, where noise is added. The U-Net removes it step by step,
+  guided by the text encoding through cross-attention. The decoder
+  $\mathcal D$ converts only the final latent $z_0$ back into an image. During
+  generation, the upper path is skipped and $z_T$ is drawn from
+  $\mathcal N(0,I)$.}
+  \label{fig:stable-diffusion}
+\end{figure}
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.1cm}p{4.3cm}p{6.3cm}@{}}
+    \toprule
+    Component & Input $\to$ output & Responsible for \\
+    \midrule
+    VAE ($\mathcal E$, $\mathcal D$) & $512^2\times3 \leftrightarrow 64^2\times4$ &
+      perceptual quality: edges, textures, fine detail \\
+    U-Net $\varepsilon_\theta$ & $(z_t,t,\tau_\theta(y))\to\hat\varepsilon$ &
+      semantic content: layout, identity, style \\
+    Text encoder $\tau_\theta$ & prompt $\to$ token embeddings & open-vocabulary
+      grounding of the prompt \\
+    \bottomrule
+  \end{tabular}
+  \caption{Division of labor in Stable Diffusion. Only the U-Net is iterated;
+  the text encoder runs once per prompt and the decoder once per image.}
+  \label{tab:sd-components}
+\end{table}
+
+\paragraph{Processing flow.}
+Figure~\ref{fig:stable-diffusion} shows the three components and how data
+flows through them. During training, the VAE encoder compresses each image
+into a latent tensor, the forward process noises this latent, and the U-Net
+learns to predict the noise, conditioned on the caption of the image. During
+generation, the encoder is not needed at all: a random latent $z_T$ is
+denoised by the U-Net over many steps, conditioned on the prompt, and the VAE
+decoder is used only once, at the very end, to convert the final denoised
+latent into an image.
+
+\paragraph{Conditioning by cross-attention.}
+The prompt is tokenized and turned into a sequence of embeddings by a
+pretrained text encoder $\tau_\theta$; Stable Diffusion uses the CLIP text
+encoder, which was trained to align images with their captions. Inside the
+U-Net, cross-attention layers (Equation~\ref{eq:transformer-cross-attention})
+connect the two modalities. The queries come from the spatial U-Net features,
+and keys and values come from the text tokens,
+$\operatorname{Attn}(Q,K,V)$ with $Q=W^Q\varphi(z_t)$ and
+$K=W^K\tau_\theta(y)$, $V=W^V\tau_\theta(y)$. Every image position can thus
+look up the words relevant to it: the region that becomes the dog attends to
+``dog,'' the background to ``forest.'' The same mechanism accepts other
+conditions, such as semantic maps or reference images, if a suitable encoder
+$\tau_\theta$ is used. Table~\ref{tab:sd-components} lists what each
+component contributes.
+
+\paragraph{Classifier-free guidance.}
+A conditional model $\varepsilon_\theta(z_t,t,y)$ tends to follow the prompt
+only loosely. Classifier-free guidance strengthens the condition without any
+extra classifier. During training, the condition is replaced by an empty
+prompt $\varnothing$ with a probability of about $0.1$, so one network learns
+both the conditional and the unconditional prediction. At inference, both are
+evaluated and extrapolated:
+\begin{equation}
+  \tilde\varepsilon = (1+w)\,\varepsilon_\theta(z_t,t,y)
+  - w\,\varepsilon_\theta(z_t,t,\varnothing)
+  = \varepsilon_\theta(z_t,t,\varnothing)
+  + (1+w)\bigl(\varepsilon_\theta(z_t,t,y)-\varepsilon_\theta(z_t,t,\varnothing)\bigr).
+  \label{eq:diff-cfg}
+\end{equation}
+\noindent
+The difference between the two predictions is the direction in which the
+prompt pushes the image; the guidance scale $w$ amplifies it. With $w=0$ the
+plain conditional model is used, with higher diversity but weaker prompt
+adherence. Large $w$ makes images very faithful to the prompt but less diverse
+and eventually oversaturated or distorted. The default guidance scale of
+Stable Diffusion is $7.5$; software libraries usually quote the factor in
+front of the difference, i.e.\ $1+w$. Guidance doubles the cost per step,
+since two predictions are needed.
+
+\subsection{Fine-Tuning with Low-Rank Adaptation}
+
+A pretrained Stable Diffusion model knows many concepts, but not a particular
+dog. Teaching it a new subject from about $100$ photographs by updating all of
+its roughly one billion parameters needs much GPU memory and easily destroys
+what the model already knows. The transfer strategies of
+Section~\ref{sec:transformers} offer a spectrum between full fine-tuning and a
+frozen backbone (Table~\ref{tab:adaptation}). \emph{Low-rank adaptation}
+(LoRA) keeps the pretrained weights frozen and learns only a small correction
+for selected weight matrices, typically the attention projections of the
+U-Net.
+
+Let a pretrained layer have weight matrix $W_0\in\mathbb R^{k\times d}$. Full
+fine-tuning would update all $k\cdot d$ entries. LoRA instead writes
+\begin{equation}
+  W = W_0 + \Delta W,\qquad \Delta W = BA,\qquad
+  A\in\mathbb R^{r\times d},\quad B\in\mathbb R^{k\times r},\quad
+  r\ll\min(d,k),
+  \label{eq:lora}
+\end{equation}
+\noindent
+and trains only $A$ and $B$. The layer computes
+$Wx=W_0x+B(Ax)$: the input is projected down to $r$ dimensions and back up.
+The correction $\Delta W$ has rank at most $r$, so it can change the layer
+only along $r$ directions. This restriction works because adapting a
+pretrained model to a narrow new task usually needs only a small change of
+low intrinsic dimension. $B$ is initialized with zeros, so $\Delta W=0$ at the
+start and training begins exactly at the pretrained model. After training,
+$BA$ can be added to $W_0$ once, so inference costs no extra time.
+
+\paragraph{Worked example.}
+For an attention projection with $d=k=1280$, full fine-tuning updates
+$1280^2=1{,}638{,}400$ parameters. LoRA with $r=8$ trains
+$r(d+k)=8\cdot2560=20{,}480$ parameters, about $1.25\,\%$ of the full matrix.
+The gradients and optimizer state shrink by the same factor, which makes
+training feasible on a simple GPU, and the stored result is a file of a few
+megabytes that is loaded on top of the unchanged base model.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.2cm}p{4.6cm}p{6.0cm}@{}}
+    \toprule
+    Strategy & What is trained & Typical use \\
+    \midrule
+    Full fine-tuning & all weights & large target dataset, enough memory \\
+    Linear probing & only a new linear head & fixed features, e.g.\
+      classification \\
+    Prompt/prefix tuning & a few learnable input tokens & steer a frozen
+      transformer \\
+    LoRA & low-rank $A$, $B$ beside frozen $W_0$ & adapt a large generative
+      model on small data and a small GPU \\
+    \bottomrule
+  \end{tabular}
+  \caption{Adaptation strategies for large pretrained models, ordered from
+  most to fewest changed weights (prompt tuning and LoRA are both very
+  light). LoRA changes the behavior of every adapted layer while training
+  only a tiny fraction of the parameters.}
+  \label{tab:adaptation}
+\end{table}
+
+\paragraph{Practical example: a personalized dog.}
+The task is to adapt a pretrained Stable Diffusion v1.5 model so that it
+generates new images of one dog, using $100$ photos of it. Every training
+image receives the same caption, ``a photo of sks dog.'' The token ``sks'' is
+a rare identifier that carries almost no prior meaning, so the model binds the
+appearance of this dog to it without overwriting the general concept ``dog.''
+Training runs the loss of Equation~\ref{eq:diff-ldm} on the dog photos, but
+gradients update only the LoRA matrices. A fine-tuning run looks like this:
+\par\noindent\begin{minipage}{\linewidth}
+\begin{verbatim}
+python finetune_lora_sd.py \
+  --pretrained_model stable-diffusion-v1-5/stable-diffusion-v1-5 \
+  --train_dir data/dogs --output_dir dog_lora \
+  --caption "a photo of sks dog" \
+  --validation_prompt "a photo of sks dog running through snow" \
+  --max_train_steps 800 --learning_rate 1e-4 --lora_rank 8 \
+  --batch_size 1 --gradient_accumulation_steps 4 \
+  --mixed_precision
+\end{verbatim}
+\end{minipage}
+
+\smallskip\noindent
+Table~\ref{tab:lora-params} explains the settings. The batch size of $1$ with
+$4$ accumulation steps sums the gradients of $4$ images before each update,
+so the effective batch size is $4$ while memory holds only one image at a
+time. With $800$ update steps the model sees $800\cdot4=3200$ images, i.e.\
+about $32$ passes over the $100$ photos. The validation prompt combines the
+new token with a scene that never occurs in the training photos; it tests
+whether the model has learned the dog as a reusable concept or merely
+memorized the training pictures.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{5.8cm}p{8.0cm}@{}}
+    \toprule
+    Setting & Meaning \\
+    \midrule
+    \texttt{-{}-caption} & shared caption; binds the new subject to ``sks'' \\
+    \texttt{-{}-lora\_rank 8} & rank $r$ of $\Delta W=BA$ \\
+    \texttt{-{}-learning\_rate 1e-4} & step size for $A$ and $B$ only \\
+    \texttt{-{}-max\_train\_steps 800} & number of parameter updates \\
+    \texttt{-{}-batch\_size 1} & images per forward/backward pass \\
+    \texttt{-{}-gradient\_accumulation\_steps} & passes summed per update ($4$);
+      effective batch size $1\cdot4=4$ \\
+    \texttt{-{}-mixed\_precision} & 16-bit arithmetic where safe; less memory,
+      faster \\
+    \texttt{-{}-seed 123} (prediction) & fixes the start noise $z_T$, so results
+      are reproducible \\
+    \bottomrule
+  \end{tabular}
+  \caption{Settings of the LoRA fine-tuning and prediction runs. All of them
+  aim at training a large model with the memory of a small GPU.}
+  \label{tab:lora-params}
+\end{table}
+
+\noindent
+For prediction, the LoRA weights are loaded on top of the base model and new
+prompts are sampled:
+\par\noindent\begin{minipage}{\linewidth}
+\begin{verbatim}
+python predict_lora_sd.py \
+  --pretrained_model stable-diffusion-v1-5/stable-diffusion-v1-5 \
+  --lora_dir dog_lora \
+  --prompt "a photo of sks dog sitting in a forest, sharp, natural light" \
+  --output_dir dog_predictions --num_images 4 --seed 123
+\end{verbatim}
+\end{minipage}
+
+\smallskip\noindent
+Each of the four images starts from a different noise latent, derived from the
+fixed seed, and is denoised under the prompt with classifier-free guidance.
+The results show dogs in a forest scene that did not appear in the training
+set. The pretrained model contributes the forest, the lighting, and the
+composition; the LoRA correction contributes the appearance of the dog. If the
+generated dogs vary in breed or coloring, the adaptation is still too weak,
+for example because of too few steps or too small a rank; if every image
+reproduces a training photo, it has overfitted.
