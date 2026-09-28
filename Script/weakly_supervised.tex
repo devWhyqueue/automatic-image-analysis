@@ -1,0 +1,878 @@
+\section{Weakly Supervised Learning}
+\label{sec:weakly}
+
+Every classifier so far was trained on a dataset in which each example carries
+a correct and precise label. Such datasets are expensive. A pixel-accurate
+segmentation mask takes minutes per image, medical labels need experts, and
+labels collected cheaply from web tags or crowd workers are often wrong. In
+practice one usually has something weaker: many unlabeled images and only a
+few labeled ones, labels for a whole image but not for the object inside it,
+or labels of which some fraction is simply wrong. \emph{Weakly supervised
+learning} (WSL) collects the methods that still train useful models from such
+data. This section first sorts weak supervision into three types, then treats
+each in turn: unlabeled data in active, semi-supervised, and transductive
+learning; coarse labels in multi-instance learning; and wrong labels, where
+early-learning regularization and negative learning prevent a network from
+memorizing the errors. It ends with a critical look at how much weak
+supervision actually gains compared with a few clean labels.
+
+\subsection{Three Types of Weak Supervision}
+
+Weak supervision can fail to be ``strong'' in three different ways.
+Figure~\ref{fig:weak-types} shows them side by side for a binary problem with
+labels \textsf{Y} and \textsf{N}; each bar stands for one feature vector.
+
+\begin{itemize}
+  \item \emph{Incomplete supervision}: only a small subset of the training
+    data is labeled; the rest has no label at all. Example: $1000$ labeled
+    and $100\,000$ unlabeled images of skin lesions.
+  \item \emph{Inexact supervision}: labels exist but are coarser than the
+    task requires. Example: the image is tagged ``tiger,'' but the task is to
+    find the tiger pixels or patches.
+  \item \emph{Inaccurate supervision}: every example has a label of the
+    desired granularity, but some labels are wrong. Example: web images
+    labeled by the surrounding text.
+\end{itemize}
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    feat/.style={draw, fill=gray!15, minimum width=1.0cm, minimum height=0.28cm,
+      inner sep=0pt},
+    lab/.style={draw, circle, minimum size=0.42cm, inner sep=0pt,
+      font=\scriptsize\sffamily},
+    bag/.style={draw, rounded corners=3pt, thick, gray!70!black},
+    ttl/.style={font=\small, align=center}
+  ]
+    % (a) incomplete
+    \foreach \y/\lv/\c in {0/Y/red!15, 0.55//white, 1.1/N/red!15,
+        1.65//white, 2.2//white} {
+      \node[feat] (f) at (0,\y) {};
+      \node[lab, right=0.25cm of f, fill=\c] {\lv};
+    }
+    \node[ttl] at (0.45,-0.75) {(a) incomplete:\\few labels};
+    % (b) inexact
+    \begin{scope}[xshift=4.2cm]
+      \foreach \y/\lv in {0/N, 1.35/Y} {
+        \node[feat] at (-0.1,\y) {};
+        \node[feat] at (-0.1,\y+0.4) {};
+        \node[feat] at (-0.1,\y+0.8) {};
+        \draw[bag] (-0.75,\y-0.28) rectangle (0.55,\y+1.08);
+        \node[lab, fill=red!15] at (1.05,\y+0.4) {\lv};
+      }
+      \node[ttl] at (0.2,-0.75) {(b) inexact:\\one label per bag};
+    \end{scope}
+    % (c) inaccurate
+    \begin{scope}[xshift=8.2cm]
+      \foreach \y/\lv/\c in {0/Y/red!15, 0.55/N/red!15, 1.1/N/orange!45,
+          1.65/Y/red!15, 2.2/Y/orange!45} {
+        \node[feat] (f) at (0,\y) {};
+        \node[lab, right=0.25cm of f, fill=\c] {\lv};
+      }
+      \node[ttl] at (0.45,-0.75) {(c) inaccurate:\\some labels wrong};
+    \end{scope}
+  \end{tikzpicture}
+  \caption{The three types of weak supervision. Bars are feature vectors,
+  circles their labels. (a) Most examples have no label. (b) Labels belong
+  to bags of instances, not to the instances. (c) Every example has a label,
+  but some are wrong (orange); the learner does not know which.}
+  \label{fig:weak-types}
+\end{figure}
+
+\noindent
+The types call for different tools, summarized in
+Table~\ref{tab:weak-types}. Incomplete supervision asks how unlabeled data
+can help at all. Inexact supervision asks how a label for a group transfers
+to its members. Inaccurate supervision asks how to stop a network from
+learning the wrong labels. Real datasets often combine the types, e.g.\ a few
+noisy image-level tags and many untagged images.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{2.2cm}p{4.4cm}p{3.9cm}p{4.2cm}@{}}
+    \toprule
+    Type & What is given & Central question & Methods here \\
+    \midrule
+    Incomplete & few labeled, many unlabeled examples & what do unlabeled
+      data reveal? & active learning, semi-supervised and transductive
+      learning \\
+    Inexact & labels for bags (e.g.\ images), task on instances (patches) &
+      which instance caused the label? & multi-instance learning \\
+    Inaccurate & a label for every example, some wrong & how to avoid
+      learning the errors? & early-learning regularization, negative
+      learning, SelNLPL \\
+    \bottomrule
+  \end{tabular}
+  \caption{Taxonomy of weak supervision. Each type has its own question and
+  its own family of methods.}
+  \label{tab:weak-types}
+\end{table}
+
+\subsection{Incomplete Supervision: Learning with Unlabeled Data}
+
+With incomplete supervision, the training set consists of $n$ labeled
+examples $\{(x_i,y_i): i=1,\dots,n\}$ and $m$ unlabeled examples
+$x'_1,\dots,x'_m$, usually with $m\gg n$. There are two ways to use the
+unlabeled part. \emph{Active learning} assumes an \emph{oracle}, typically a
+human expert, who can be asked for the true label of selected unlabeled
+examples. The learner picks the examples whose labels would help most, for
+instance those closest to the current decision boundary, and asks only for
+those. The goal is a good model with as few queries as possible.
+\emph{Semi-supervised learning} uses the unlabeled data automatically,
+without any human in the loop. It comes in two variants that differ in what
+the unlabeled data are and what the output is.
+
+\begin{itemize}
+  \item \emph{Pure semi-supervised learning} works under an
+    \emph{open-world} assumption. The test data are unknown at training time;
+    the unlabeled data are not necessarily the test data. The output is a
+    classifier $f$ that can label any future input.
+  \item \emph{Transductive learning} works under a \emph{closed-world}
+    assumption. The test data are given in advance, and they are exactly the
+    unlabeled examples. The goal is to label them as well as possible; no
+    general function $f$ is needed.
+\end{itemize}
+
+\noindent
+Figure~\ref{fig:ssl-settings} compares the three workflows. In all three, a
+model is trained from labeled and unlabeled data. They differ in whether a
+human adds labels during training and in what the model predicts afterwards.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    db/.style={draw, cylinder, shape border rotate=90, aspect=0.25,
+      minimum width=1.25cm, minimum height=0.9cm, align=center,
+      font=\scriptsize},
+    box/.style={draw, rounded corners=2pt, minimum height=0.8cm,
+      minimum width=1.3cm, align=center, font=\scriptsize},
+    arr/.style={-{Latex[length=2mm]}, thick},
+    ttl/.style={font=\small\bfseries, anchor=west}
+  ]
+    % row 1: active learning
+    \node[ttl] at (-0.8,0.95) {Active learning};
+    \node[db] (l1) at (0,0) {labeled};
+    \node[db, draw=red!70!black] (u1) at (1.9,0) {unlabeled};
+    \node[box, fill=yellow!20] (o1) at (4.3,0) {oracle\\(expert)};
+    \node[box] (m1) at (6.9,0) {model};
+    \node[box] (t1) at (9.6,0) {unseen\\test data};
+    \draw[arr] (u1.east) -- node[above, font=\scriptsize] {query} (o1.west);
+    \draw[arr] (o1.south) to[bend left=25]
+      node[below, font=\scriptsize, pos=0.5] {true labels} (l1.south);
+    \draw[arr] (o1.east) -- node[above, font=\scriptsize] {train} (m1.west);
+    \draw[arr] (m1.east) -- node[above, font=\scriptsize] {predict} (t1.west);
+    % row 2: pure semi-supervised
+    \node[ttl] at (-0.8,-1.75) {Pure semi-supervised learning};
+    \node[db] (l2) at (0,-2.7) {labeled};
+    \node[db, draw=red!70!black] (u2) at (1.9,-2.7) {unlabeled};
+    \node[box] (m2) at (6.9,-2.7) {model};
+    \node[box] (t2) at (9.6,-2.7) {unseen\\test data};
+    \draw[arr] (u2.east) -- node[above, font=\scriptsize] {train} (m2.west);
+    \draw[arr] (m2.east) -- node[above, font=\scriptsize] {predict} (t2.west);
+    % row 3: transductive
+    \node[ttl] at (-0.8,-3.95) {Transductive learning};
+    \node[db] (l3) at (0,-4.9) {labeled};
+    \node[db, draw=red!70!black] (u3) at (1.9,-4.9) {unlabeled};
+    \node[box] (m3) at (6.9,-4.9) {model};
+    \node[db, draw=red!70!black] (t3) at (9.6,-4.9) {same\\unlabeled};
+    \draw[arr] (u3.east) -- node[above, font=\scriptsize] {train} (m3.west);
+    \draw[arr] (m3.east) -- node[above, font=\scriptsize] {predict} (t3.west);
+  \end{tikzpicture}
+  \caption{Three ways to use unlabeled data. Active learning asks an oracle
+  for labels of selected examples. Pure semi-supervised learning uses the
+  unlabeled data without a human and predicts on unseen test data.
+  Transductive learning predicts exactly on the unlabeled data it was trained
+  with.}
+  \label{fig:ssl-settings}
+\end{figure}
+
+\paragraph{Induction versus transduction.}
+The difference between the settings is clearest when written as mappings.
+Ordinary supervised learning is \emph{induction}: from labeled examples, infer
+a general function,
+\begin{equation}
+  \{(x_i,y_i): i=1,\dots,n\} \;\mapsto\; f .
+\end{equation}
+Pure semi-supervised learning is induction with unlabeled data,
+\begin{equation}
+  \{(x_i,y_i): i=1,\dots,n\}\cup\{x'_1,\dots,x'_m\} \;\mapsto\; f ,
+\end{equation}
+and \emph{transduction} skips the function and outputs labels directly,
+\begin{equation}
+  \{(x_i,y_i): i=1,\dots,n\}\cup\{x'_1,\dots,x'_m\} \;\mapsto\;
+  (y'_1,\dots,y'_m).
+  \label{eq:transduction}
+\end{equation}
+The output of transduction is a vector of labels, not a function. The idea,
+due to Vapnik, is that one should not solve a harder problem (find $f$ for
+every possible input) as an intermediate step when only a simpler one ($m$
+particular labels) is asked. Information is transferred directly from the
+labeled to the unlabeled examples. The price is that a new test image
+requires a new transductive run. Which setting to choose depends on whether
+unlabeled data are available, whether an interpretable function $f$ is
+needed, and whether one can afford to retrain for every new batch of test
+data.
+
+\paragraph{Why unlabeled data help: the cluster assumption.}
+An unlabeled example carries no label, so it is not obvious why it helps. It
+does carry information about \emph{where the data lie}.
+Figure~\ref{fig:cluster-assumption} gives the standard example. With one
+labeled point of each class, a test point halfway between them cannot be
+decided. After observing unlabeled points, it becomes clear that the test
+point lies in the same dense cluster as the positive example. The
+\emph{cluster assumption} states that points in the same cluster tend to
+share a label, or equivalently that the decision boundary should pass
+through low-density regions. Semi-supervised methods rely on this or a
+related assumption. If it fails, for example because the classes overlap in
+one dense blob, unlabeled data do not help and can even hurt.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    pt/.style={circle, fill=gray!55, inner sep=0pt, minimum size=5pt},
+    lbl/.style={font=\small, align=center}
+  ]
+    % left: labeled only
+    \node[font=\Large] at (0,0) {$+$};
+    \node[font=\Large] at (3.0,0) {$-$};
+    \draw[thick] (1.2,0) circle (4pt);
+    \node[lbl] at (1.2,0.75) {test point:\\$+$ or $-$?};
+    % arrow
+    \draw[-{Latex[length=2.5mm]}, thick] (3.7,0) -- (5.0,0)
+      node[midway, above, font=\scriptsize, align=center]
+      {observe\\unlabeled data};
+    % right: with unlabeled cluster
+    \begin{scope}[xshift=5.8cm]
+      \foreach \p in {(0.3,0.55), (0.8,0.8), (1.3,0.6), (0.6,-0.5),
+          (1.1,-0.7), (1.6,-0.35), (0.25,-0.1), (1.75,0.25), (1.5,-0.9),
+          (2.8,0.7), (3.3,0.45), (3.7,0.8), (3.1,-0.3), (3.6,-0.6),
+          (4.0,-0.1), (3.4,-0.95)}
+        \node[pt] at \p {};
+      \node[font=\Large] at (0,0) {$+$};
+      \node[font=\Large] at (3.0,0) {$-$};
+      \draw[thick] (1.2,0) circle (4pt);
+      \draw[dashed, blue!70!black, thick] (2.25,-1.2) -- (2.25,1.2);
+      \node[lbl, text=blue!70!black] at (2.25,1.5) {boundary in gap};
+      \node[lbl] at (1.2,-1.45) {test point: $+$};
+    \end{scope}
+  \end{tikzpicture}
+  \caption{The cluster assumption. With two labeled points alone, the test
+  point (circle) is ambiguous. Unlabeled points (gray) reveal two clusters;
+  the boundary should run through the empty gap, so the test point belongs
+  to the positive cluster.}
+  \label{fig:cluster-assumption}
+\end{figure}
+
+\paragraph{A mixture model with unlabeled data.}
+The cluster assumption can be made precise with a mixture model. Assume the
+data come from a mixture of components $g=1,\dots,K$ with weights
+$\alpha_j$ and densities $f(x\mid\theta_j)$, for example Gaussians. A binary
+classifier with classes $c\in\{\textsf{Y},\textsf{N}\}$ decides via the
+component that probably generated $x$:
+\begin{align}
+  h(x) &= \arg\max_{c\in\{\textsf{Y},\textsf{N}\}}
+    \sum_{j=1}^{K} P(y=c \mid g=j, x)\; P(g=j\mid x),
+  \label{eq:ssl-mixture}\\
+  P(g=j\mid x) &= \frac{\alpha_j f(x\mid\theta_j)}
+    {\sum_{k=1}^{K}\alpha_k f(x\mid\theta_k)} .
+  \nonumber
+\end{align}
+The second factor, the posterior of component $j$, depends only on $x$. It
+can therefore be estimated from \emph{all} examples, labeled or not, e.g.\
+with the EM algorithm of Appendix~\ref{app:gmm}. Only the first factor, which
+component corresponds to which class, requires labels. If the clusters are
+well separated, a handful of labeled examples per component suffices to fix
+this assignment, while the shape and position of the components come from
+the unlabeled majority.
+
+\paragraph{Worked example.}
+Two Gaussian components have been fitted with EM on $10\,000$ images, of which
+only $20$ are labeled. Of the labeled images that fall into component $1$
+(highest $P(g=1\mid x)$), $9$ are \textsf{Y} and $1$ is \textsf{N}; of those
+in component $2$, $1$ is \textsf{Y} and $9$ are \textsf{N}. Then
+$P(y=\textsf{Y}\mid g=1)\approx0.9$ and $P(y=\textsf{Y}\mid g=2)\approx0.1$.
+A new image with $P(g=1\mid x)=0.7$ gets
+\begin{equation*}
+  P(\textsf{Y}\mid x)\approx 0.9\cdot0.7 + 0.1\cdot0.3 = 0.66,
+  \qquad
+  P(\textsf{N}\mid x)\approx 0.1\cdot0.7 + 0.9\cdot0.3 = 0.34,
+\end{equation*}
+so $h(x)=\textsf{Y}$. Twenty labels could not have estimated two
+high-dimensional Gaussians, but they suffice to name the components.
+
+\paragraph{Measuring label efficiency.}
+A frequent practical question is how many labels a representation needs. A
+\emph{learning curve} answers it: train the same classifier, e.g.\ a linear
+SVM, on stratified fractions of the labeled set ($1\,\%$, $5\,\%$,
+$10\,\%$, $25\,\%$, $50\,\%$, $100\,\%$) and plot test accuracy against the
+fraction. Stratification keeps the class proportions equal in every
+fraction, so small fractions are not missing whole classes, and the SVM
+parameter $C$ should be re-chosen by cross-validation at each fraction
+because the best regularization depends on the amount of data. Comparing a
+handcrafted feature such as HOG with frozen self-supervised features such as
+DINO (Appendix~\ref{app:foundation}) on the same curve shows directly how
+much the unlabeled pretraining saves: a good representation reaches a given
+accuracy with a much smaller fraction. This is a form of exploiting unlabeled
+data too, only the unlabeled data were used before, during pretraining.
+
+\subsection{Inexact Supervision: Multi-Instance Learning}
+
+In inexact supervision some label information is present, but not at the
+level the task needs. The best-known case is \emph{multi-instance learning}
+(MIL). The training data are organized into \emph{bags}, i.e.\ sets of
+instances, and only the bag carries a label. In the binary case the rule is:
+a bag is positive if at least one of its instances is positive, and negative
+if all of its instances are negative.
+
+Images fit this pattern naturally, as Figure~\ref{fig:mil} shows. An image is
+a bag; its patches are the instances. The label ``tiger'' says that some
+patches show the tiger, but not which ones; most patches show grass, trees,
+or background. An image without a tiger guarantees that none of its patches
+show a tiger. Formally, with bag $B=\{x_1,\dots,x_K\}$, hidden instance labels
+$y_k\in\{0,1\}$, and bag label $Y$,
+\begin{equation}
+  Y = \max_{k=1,\dots,K} y_k .
+  \label{eq:mil}
+\end{equation}
+The goal is to predict labels of unseen bags, and often, as a by-product, to
+find the positive instances inside them.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    cell/.style={draw, minimum size=0.55cm, inner sep=0pt},
+    lbl/.style={font=\small, align=center}
+  ]
+    % positive bag
+    \foreach \i in {0,...,4} \foreach \j in {0,...,3}
+      \node[cell, fill=green!8] at (\i*0.55,\j*0.55) {};
+    \foreach \i/\j in {1/1, 2/1, 2/2, 1/2, 3/2}
+      \node[cell, fill=orange!60] at (\i*0.55,\j*0.55) {};
+    \draw[very thick] (-0.275,-0.275) rectangle (2.475,1.925);
+    \node[lbl] at (1.1,-0.75) {bag label $Y=1$ (``tiger'')};
+    \node[lbl, font=\scriptsize] at (1.1,2.35)
+      {some instances positive (orange)};
+    % negative bag
+    \begin{scope}[xshift=5.2cm]
+      \foreach \i in {0,...,4} \foreach \j in {0,...,3}
+        \node[cell, fill=green!8] at (\i*0.55,\j*0.55) {};
+      \draw[very thick] (-0.275,-0.275) rectangle (2.475,1.925);
+      \node[lbl] at (1.1,-0.75) {bag label $Y=0$};
+      \node[lbl, font=\scriptsize] at (1.1,2.35)
+        {all instances negative};
+    \end{scope}
+    % pooling sketch
+    \begin{scope}[xshift=9.6cm]
+      \node[draw, rounded corners=2pt, align=center, font=\scriptsize,
+        minimum width=1.6cm] (s) at (0,1.3) {patch scores\\$s(x_1),\dots,s(x_K)$};
+      \node[draw, rounded corners=2pt, align=center, font=\scriptsize,
+        minimum width=1.6cm] (p) at (0,0) {$\max_k s(x_k)$};
+      \draw[-{Latex[length=2mm]}, thick] (s) -- (p);
+      \node[lbl] at (0,-0.75) {bag score};
+    \end{scope}
+  \end{tikzpicture}
+  \caption{Multi-instance learning on images. An image is a bag of patches.
+  A positive image contains at least one positive patch, whose position is
+  unknown; a negative image contains none. A network can score every patch
+  and pool the scores with a maximum to obtain the bag score.}
+  \label{fig:mil}
+\end{figure}
+
+\noindent
+The asymmetry of Equation~\ref{eq:mil} matters for learning. Every instance
+of a negative bag is a certain negative example, so negative bags provide
+clean instance-level labels. A positive bag says only that the maximum is
+positive, so it constrains just its most positive instance. A common neural
+implementation scores each patch with a shared network $s(x_k)$, pools the
+scores with a maximum (or a smooth version such as log-sum-exp or attention
+pooling), and trains the pooled bag score with the binary cross-entropy on
+$Y$. The gradient then flows mainly into the patch that currently has the
+highest score. After training, the patch scores themselves act as a coarse
+localization, although the image label never said where the object was.
+
+\paragraph{Worked example.}
+A bag of four patches receives scores $0.1,\,0.8,\,0.3,\,0.2$ after the
+sigmoid. With max pooling the bag probability is $0.8$. If the bag label is
+$Y=1$, the loss is $-\log0.8\approx0.22$ and only the second patch receives a
+gradient, pushing its score further up. If the bag label is $Y=0$, the loss
+is $-\log(1-0.8)\approx1.61$, again concentrated on the second patch, now
+pushing it down. Repeated over many bags, patches that appear only in positive
+images are pushed up and patches that also appear in negative images are
+pushed down.
+
+\subsection{Inaccurate Supervision and Memorization}
+
+In inaccurate supervision every training example has a label, but some
+labels are wrong. The learner does not know which ones. Two noise models are
+common in experiments. With \emph{symmetric noise}, a fraction of the labels
+is replaced by a class drawn uniformly at random. In the
+\emph{symmetric-inclusive} variant the random draw includes the true class,
+so with $30\,\%$ noise and $C=10$ classes, $30\,\%\cdot\frac{9}{10}=27\,\%$ of
+the labels are actually wrong. With \emph{asymmetric noise}, labels are
+flipped to specific similar classes, e.g.\ truck to automobile or cat to dog,
+which mimics real annotator confusions.
+
+\paragraph{Memorization.}
+A deep network has enough capacity to fit any labeling of its training set,
+even random labels. With noisy labels, perfect training accuracy therefore
+means that the network has also learned the wrong labels. This is called
+\emph{memorization}. Figure~\ref{fig:memorization} shows how it unfolds with
+the ordinary cross-entropy loss. For clean examples, the fraction predicted
+correctly rises and stays high. For the wrongly labeled examples, the
+prediction is compared with their \emph{true} class. Surprisingly, in the
+first epochs the network predicts the true class for most of them, although
+it was never told that class: it has learned the general pattern of each
+class from the clean majority and applies it to the mislabeled examples too.
+Later, the fraction predicted as the \emph{wrong training label} rises, and
+at the end almost all wrong labels are memorized. With early-learning
+regularization (next subsection), the curve for the wrong labels stays as
+it was after early learning.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    ax/.style={-{Latex[length=1.6mm]}},
+    lbl/.style={font=\scriptsize}
+  ]
+    \foreach \dx/\ttl/\reg in {0/Cross-entropy/0, 7.2/Early-learning
+        regularization/1} {
+      \begin{scope}[xshift=\dx cm]
+        \draw[ax] (0,0) -- (5.6,0);
+        \node[lbl] at (2.5,-0.6) {epoch};
+        \draw[ax] (0,0) -- (0,3.3);
+        \node[lbl, rotate=90] at (-0.85,1.5) {fraction of examples};
+        \foreach \t in {0,60,120}
+          \draw (\t/120*5,0) -- ++(0,-0.08) node[below, lbl] {\t};
+        \foreach \v in {0,0.5,1}
+          \draw (0,\v*3) -- ++(-0.08,0) node[left, lbl] {\v};
+        \node[font=\small] at (2.6,3.55) {\ttl};
+        \ifnum\reg=0
+          \draw[green!55!black, very thick, dashed]
+            plot[domain=0:120, samples=60, smooth]
+            ({\x/120*5},{3*(0.35+0.42*(1-exp(-\x/5))-0.70/(1+exp(-(\x-60)/12)))});
+          \draw[red!75!black, very thick]
+            plot[domain=0:120, samples=60, smooth]
+            ({\x/120*5},{3*(0.07-0.03*(1-exp(-\x/5))+0.85/(1+exp(-(\x-75)/14)))});
+          \node[lbl, green!45!black] at (1.2,2.55) {true class};
+          \node[lbl, red!75!black, align=center] at (4.6,1.25)
+            {wrong label\\memorized};
+        \else
+          \draw[green!55!black, very thick, dashed]
+            plot[domain=0:120, samples=60, smooth]
+            ({\x/120*5},{3*(0.35+0.53*(1-exp(-\x/8)))});
+          \draw[red!75!black, very thick]
+            plot[domain=0:120, samples=60, smooth]
+            ({\x/120*5},{3*(0.07-0.04*(1-exp(-\x/5)))});
+          \node[lbl, green!45!black] at (3.6,2.3) {true class};
+          \node[lbl, red!75!black] at (3.6,0.4) {wrong label memorized};
+        \fi
+      \end{scope}
+    }
+  \end{tikzpicture}
+  \caption{Schematic training curves for the wrongly labeled examples of a
+  noisy dataset. With cross-entropy, the network first predicts their true
+  class (early learning) and later reproduces their wrong training label
+  (memorization). Early-learning regularization keeps the early behavior.
+  For the clean examples, the fraction predicted correctly rises in both
+  cases.}
+  \label{fig:memorization}
+\end{figure}
+
+\paragraph{Why memorization comes late.}
+The cross-entropy for $n$ examples with one-hot training labels
+$\mathbf y^{[i]}$ and softmax outputs $\mathbf p^{[i]}$ is
+\begin{equation}
+  \mathcal L_{\mathrm{CE}}(\Theta) = -\frac1n\sum_{i=1}^{n}\sum_{c=1}^{C}
+    y^{[i]}_c \log p^{[i]}_c .
+  \label{eq:weak-ce}
+\end{equation}
+Its gradient with respect to the logit $z^{[i]}_c$ of example $i$ is the
+simple residual
+\begin{equation}
+  \frac{\partial \mathcal L_{\mathrm{CE}}}{\partial z^{[i]}_c}
+    = \frac1n\bigl(p^{[i]}_c - y^{[i]}_c\bigr).
+  \label{eq:ce-grad}
+\end{equation}
+Early in training, all examples have large residuals. The clean examples
+form the majority and agree with each other, so their gradients add up and
+dominate; the network learns the true class structure. Once the clean
+examples are fitted, $\mathbf p^{[i]}\approx\mathbf y^{[i]}$ and their
+gradients vanish. The wrongly labeled examples are still predicted as their
+true class, which disagrees with their training label, so their residuals
+stay close to $1$. From this point on, they dominate the total gradient and
+the network gradually bends its decision boundary around them.
+
+\paragraph{The simulated experiment.}
+This mechanism was shown analytically for a simple case. The inputs come from
+two Gaussians with opposite means,
+\begin{equation}
+  x\sim\mathcal N(+\mathbf v,\sigma^2 I_{p\times p})\ \text{if } \mathbf y^*=(1,0),
+  \qquad
+  x\sim\mathcal N(-\mathbf v,\sigma^2 I_{p\times p})\ \text{if } \mathbf y^*=(0,1),
+\end{equation}
+where $\mathbf v$ is a unit vector and $\mathbf y^*$ the true label. The
+optimal separator is the hyperplane through the origin perpendicular to
+$\mathbf v$. Each training label equals the true label with probability
+$1-\Delta$ and is replaced by the other label with probability $\Delta$. A
+linear classifier trained by gradient descent on the cross-entropy then
+behaves as follows (informal theorem): for any noise rate $\Delta\in(0,1)$,
+under further conditions on dimension and sample size, there is an iteration
+$T$ such that
+\begin{enumerate}
+  \item \emph{early learning succeeds}: for $t<T$, the classifier predicts the
+    \emph{true} labels of the wrongly labeled examples better than at
+    initialization;
+  \item the gradients of the \emph{correctly} labeled examples vanish between
+    $t=0$ and $t=T$;
+  \item \emph{memorization} occurs as $t\to\infty$.
+\end{enumerate}
+The network output in the early-learning phase therefore contains useful
+information about which labels are wrong. The methods below exploit it.
+Early stopping would be the naive remedy, but the right stopping time is
+unknown without clean validation data, and the model is still immature at
+that point.
+
+\subsection{Early-Learning Regularization}
+
+\emph{Early-learning regularization} (ELR) keeps the network close to what it
+predicted during early learning. For each training example it maintains a
+\emph{target} vector $\mathbf t^{[i]}$ computed from the network's own past
+outputs, typically as a running average over epochs,
+\begin{equation}
+  \mathbf t^{[i]} \leftarrow \beta\,\mathbf t^{[i]} + (1-\beta)\,\mathbf p^{[i]},
+  \qquad \beta\in[0,1) ,
+\end{equation}
+and adds a term that rewards agreement between the current prediction and
+the target:
+\begin{equation}
+  \mathcal L_{\mathrm{ELR}}(\Theta) = \mathcal L_{\mathrm{CE}}(\Theta)
+    + \frac{\lambda}{n}\sum_{i=1}^{n}
+    \log\Bigl(1-\bigl\langle \mathbf p^{[i]},\mathbf t^{[i]}\bigr\rangle\Bigr).
+  \label{eq:elr}
+\end{equation}
+The dot product $\langle\mathbf p,\mathbf t\rangle=\sum_c p_c t_c$ measures the
+similarity of two probability vectors; it is large when both put their mass
+on the same class. Maximizing it makes $\log(1-\langle\mathbf p,\mathbf
+t\rangle)$ very negative, which lowers the loss. Because the target is
+computed from past outputs rather than from the noisy label, the regularizer
+pulls every example towards the class the network believed in early, which
+for mislabeled examples is mostly the true class. How to estimate the
+target best is still a research question; the running average is a simple
+and effective choice.
+
+\paragraph{Effect on the gradient.}
+Differentiating the regularizer of one example with respect to its logit
+$z_c$ (softmax derivative $\partial p_k/\partial z_c=p_k(\delta_{kc}-p_c)$)
+gives
+\begin{equation}
+  \frac{\partial}{\partial z_c}\log\bigl(1-\langle\mathbf p,\mathbf t\rangle\bigr)
+  = -\frac{p_c\,\bigl(t_c-\langle\mathbf p,\mathbf t\rangle\bigr)}
+    {1-\langle\mathbf p,\mathbf t\rangle}.
+  \label{eq:elr-grad}
+\end{equation}
+Let $c^*$ be the true class and assume the target puts most weight on it, so
+$t_{c^*}>\langle\mathbf p,\mathbf t\rangle$. Then the ELR gradient for $c^*$
+is negative, and gradient descent increases $z_{c^*}$. Compare this with the
+cross-entropy gradient $p_{c^*}-y_{c^*}$ of Equation~\ref{eq:ce-grad}:
+\begin{itemize}
+  \item For a \emph{clean} example, $y_{c^*}=1$ and the CE gradient
+    $p_{c^*}-1$ is negative early and approaches $0$ once the example is
+    fitted. The ELR term adds another negative contribution, so both terms
+    agree.
+  \item For a \emph{wrongly labeled} example, $y_{c^*}=0$ and the CE gradient
+    $p_{c^*}$ is positive; it pushes the true class \emph{down}, which is
+    memorization. The ELR gradient has the opposite sign and roughly
+    cancels it, so the wrong label cannot take over.
+\end{itemize}
+In the early phase, the CE gradients of the clean labels dominate and drive
+learning. Later, when they vanish, ELR neutralizes the wrong labels instead
+of letting them dominate. The clean labels thus stay in charge throughout
+training.
+
+\paragraph{Worked example.}
+A mislabeled image has true class $c^*$, current output $p_{c^*}=0.6$, and
+target $\mathbf t$ with $t_{c^*}=0.9$; assume $\langle\mathbf p,\mathbf
+t\rangle=0.56$. The CE gradient for $z_{c^*}$ is $+0.6$ (push down). The ELR
+gradient is $-0.6\cdot(0.9-0.56)/(1-0.56)\approx-0.46$ per unit of $\lambda$.
+With $\lambda=3$, the regularizer contributes $\approx-1.39$, and the sum is
+negative: the true class is strengthened despite the wrong label. Note the
+factor $1/(1-\langle\mathbf p,\mathbf t\rangle)$: the closer the prediction
+already is to the target, the stronger the regularizer holds it there.
+
+\subsection{Negative Learning for Noisy Labels}
+
+The standard training signal, called \emph{positive learning} (PL) in this
+context, tells the network ``this input belongs to this label.'' If the label
+is wrong, the statement is wrong, and the network learns a wrong decision
+boundary. \emph{Negative learning} (NL) uses a weaker but much safer
+statement: ``this input does \emph{not} belong to this other label.'' Take an
+image of a dog labeled ``car'' by mistake. PL trains ``this is a car,'' which
+is false. NL picks a random class other than the given label, say ``bird,''
+and trains ``this is not a bird,'' which is true.
+
+The two losses for $C$ classes are
+\begin{align}
+  \text{PL:}\quad \mathcal L(f,y) &= -\sum_{k=1}^{C} y_k\log p_k ,
+  \label{eq:pl}\\
+  \text{NL:}\quad \mathcal L(f,\bar y) &= -\sum_{k=1}^{C} \bar y_k\log(1-p_k) ,
+  \label{eq:nl}
+\end{align}
+where $\mathbf y$ is the one-hot given label and $\bar{\mathbf y}$ the one-hot
+\emph{complementary label}. PL pushes $p_y$ towards $1$; NL pushes
+$p_{\bar y}$ towards $0$. The complementary label is drawn anew in every
+iteration, uniformly from all classes except the given one:
+\begin{equation}
+  \bar y \sim \mathcal U\bigl(\{1,\dots,C\}\setminus\{y\}\bigr).
+\end{equation}
+
+\paragraph{Why NL is robust.}
+A complementary label is wrong only if it hits the true class. For a clean
+example this is impossible, because the true class is the excluded label.
+For a mislabeled example, the true class is one of the $C-1$ candidates, so
+the chance is $1/(C-1)$. On CIFAR-10 ($C=10$) with $27\,\%$ wrong labels:
+\begin{equation*}
+  P(\text{PL statement wrong}) = 0.27,
+  \qquad
+  P(\text{NL statement wrong}) = 0.27\cdot\tfrac19 = 0.03 .
+\end{equation*}
+NL thus reduces the rate of misleading training signals by a factor $C-1$.
+The price is less information per step: ``not a bird'' excludes one of ten
+classes, while ``a car'' fixes the class. NL converges more slowly and on
+its own reaches a lower final accuracy than PL on clean data.
+
+\paragraph{Observed behavior.}
+With $30\,\%$ symmetric-inclusive noise on CIFAR-10, a CNN trained with PL
+reaches almost $100\,\%$ accuracy on the noisy training labels, while its
+accuracy on the clean test set peaks early and then drops as it memorizes;
+the test loss rises again. The same CNN trained with NL fits the noisy
+training labels much less, but its test accuracy keeps increasing and ends
+clearly above PL. The difference is visible in the confidence $p_y$ that each
+network assigns to the \emph{given} label of each training image
+(Figure~\ref{fig:nl-hist}). After PL, both clean and wrongly labeled images
+have $p_y$ near $1$: the wrong labels are treated as correct. After NL, the
+wrongly labeled images have $p_y$ near $0$, while the clean ones spread over
+higher values. The given label is no longer believed where it is wrong, so
+$p_y$ becomes a noise detector.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    lbl/.style={font=\scriptsize}
+  ]
+    \foreach \dx/\ttl/\clean/\noisy in {
+        0/PL/{0,0,0,0,0,0,0.02,0.05,0.12,0.25,0.4,1.0}/{0,0,0,0,0,0,0.03,0.08,0.14,0.17,0.12,0.06},
+        4.6/NL/{0.01,0.04,0.06,0.08,0.11,0.14,0.2,0.3,0.45,0.3,0.05,0.0}/{0.9,0.25,0.06,0.02,0.01,0,0,0,0,0,0,0},
+        9.2/{SelNL\,$\to$\,SelPL}/{0,0,0,0,0,0,0,0,0,0,0.06,1.0}/{0.8,0.02,0,0,0,0,0,0,0,0,0,0}} {
+      \begin{scope}[xshift=\dx cm]
+        \foreach [count=\i from 0] \h in \clean
+          \fill[blue!45, opacity=0.8] (\i*0.3,0) rectangle ++(0.3,\h*2);
+        \foreach [count=\i from 0] \h in \noisy
+          \fill[orange!80, opacity=0.8] (\i*0.3,0) rectangle ++(0.3,\h*2);
+        \draw[-{Latex[length=1.5mm]}] (0,0) -- (3.8,0);
+        \draw[-{Latex[length=1.5mm]}] (0,0) -- (0,2.3);
+        \node[lbl, below] at (0,0) {0};
+        \node[lbl, below] at (3.6,0) {1};
+        \node[lbl, below] at (1.8,-0.05) {$p_y$};
+        \node[font=\small] at (1.8,2.55) {\ttl};
+      \end{scope}
+    }
+    \fill[blue!45] (3.2,-1.0) rectangle ++(0.3,0.2);
+    \node[lbl, anchor=west] at (3.55,-0.9) {correct label};
+    \fill[orange!80] (6.2,-1.0) rectangle ++(0.3,0.2);
+    \node[lbl, anchor=west] at (6.55,-0.9) {wrong label};
+  \end{tikzpicture}
+  \caption{Schematic histograms of the confidence $p_y$ in the given label
+  for all training images (CIFAR-10, $30\,\%$ symmetric-inclusive noise).
+  After PL, wrong labels look as confident as correct ones. After NL, they
+  collect near $0$. Selective NL and PL sharpen the separation until clean
+  and noisy data are almost perfectly split.}
+  \label{fig:nl-hist}
+\end{figure}
+
+\paragraph{Selective NL and selective PL.}
+The separation after NL is good but not perfect, and plain NL learns slowly.
+Two selective stages refine it, together called SelNLPL:
+\begin{itemize}
+  \item \emph{Selective negative learning} (SelNL) continues NL, but only on
+    examples whose confidence in the given label exceeds $1/C$, i.e.\ is
+    higher than uniform guessing. Examples with lower confidence are likely
+    mislabeled and are excluded, so they no longer disturb training. After
+    SelNL, the clean examples move towards $p_y\approx1$.
+  \item \emph{Selective positive learning} (SelPL) then switches to PL, the
+    faster and more informative loss, but only for examples with $p_y>\gamma$,
+    with $\gamma=0.5$ in practice. These are almost exclusively clean
+    examples, so PL can now be used without learning wrong labels. After
+    SelPL, nearly all clean data have confidence close to $1$, and the noisy
+    data stay near $0$.
+\end{itemize}
+Table~\ref{tab:selnlpl} lists the three stages. Each runs for a number of
+epochs $T$ on the same network $f(x;\theta)$.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{1.9cm}p{4.3cm}p{2.2cm}p{5.4cm}@{}}
+    \toprule
+    Stage & Examples used in a batch & Loss & Purpose \\
+    \midrule
+    1.\ NL & all & NL, Eq.~\ref{eq:nl} & robust start; separate clean from
+      noisy \\
+    2.\ SelNL & only if $p_y>1/C$ & NL, Eq.~\ref{eq:nl} & ignore likely noisy
+      examples \\
+    3.\ SelPL & only if $p_y>\gamma$ ($\gamma=0.5$) & PL, Eq.~\ref{eq:pl} &
+      fast, precise learning on likely clean data \\
+    \bottomrule
+  \end{tabular}
+  \caption{The SelNLPL procedure. The selection threshold rises from stage
+  to stage, and the loss switches from the safe negative loss to the
+  informative positive loss once the data are filtered.}
+  \label{tab:selnlpl}
+\end{table}
+
+\paragraph{Pseudo-labeling the noisy part.}
+After SelNLPL, the training data are split into a \emph{clean} set (high
+$p_y$) and a \emph{noisy} set (low $p_y$). The noisy images are still useful
+images, only their labels are not. Treating them as unlabeled data turns the
+problem into semi-supervised learning, and \emph{pseudo-labeling} closes the
+loop (Figure~\ref{fig:pseudo-label}):
+\begin{enumerate}
+  \item Divide the training data into clean and noisy data using the CNN
+    trained with SelNLPL.
+  \item Train a freshly initialized CNN on the clean data only.
+  \item Relabel the noisy data with the \emph{soft} output of this CNN, i.e.\
+    the full probability vector instead of a one-hot label, which keeps the
+    network's uncertainty.
+  \item Train another freshly initialized CNN on the clean data plus the
+    relabeled data.
+\end{enumerate}
+
+\begin{figure}[ht]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={draw, rounded corners=2pt, minimum height=0.9cm,
+      minimum width=1.7cm, align=center, font=\scriptsize},
+    dat/.style={draw, minimum height=0.6cm, minimum width=1.4cm,
+      align=center, font=\scriptsize},
+    arr/.style={-{Latex[length=2mm]}, thick},
+    lbl/.style={font=\scriptsize}
+  ]
+    \node[dat, fill=yellow!25] (td) at (0,0) {training\\data};
+    \node[box] (n1) at (2.3,0) {CNN\\(SelNLPL)};
+    \node[dat, fill=orange!30] (nd) at (4.7,0.85) {noisy};
+    \node[dat, fill=blue!15] (cd) at (4.7,-0.85) {clean};
+    \node[box] (n2) at (7.0,0) {new CNN};
+    \node[dat, fill=orange!55] (rd) at (9.3,0.85) {relabeled\\(soft)};
+    \node[dat, fill=blue!15] (cd2) at (9.3,-0.85) {clean};
+    \node[box] (n3) at (11.6,0) {new CNN\\(final)};
+    \draw[arr] (td) -- (n1);
+    \draw[arr] (n1.east) -- (nd.west);
+    \draw[arr] (n1.east) -- (cd.west);
+    \draw[arr] (cd.east) -- (n2.west);
+    \draw[arr] (nd.east) -- (n2.west);
+    \draw[arr] (n2.east) -- (rd.west);
+    \draw[arr] (rd.east) -- (n3.west);
+    \draw[arr] (cd2.east) -- (n3.west);
+    \draw[decorate, decoration={brace, mirror, amplitude=4pt}]
+      (-0.7,-1.5) -- (5.4,-1.5) node[midway, below=4pt, lbl] {(1) split};
+    \draw[decorate, decoration={brace, mirror, amplitude=4pt}]
+      (5.6,-1.5) -- (10.0,-1.5) node[midway, below=4pt, lbl]
+      {(2)--(3) train on clean, relabel noisy};
+    \draw[decorate, decoration={brace, mirror, amplitude=4pt}]
+      (10.2,-1.5) -- (12.5,-1.5) node[midway, below=4pt, lbl] {(4) retrain};
+  \end{tikzpicture}
+  \caption{Pseudo-labeling after SelNLPL. The noisy labels are discarded
+  and replaced by soft labels predicted by a network trained on the clean
+  part; the final network learns from all images.}
+  \label{fig:pseudo-label}
+\end{figure}
+
+\paragraph{Results.}
+Table~\ref{tab:nl-results} shows test accuracies on CIFAR-10 and CIFAR-100
+(ResNet-34). Plain cross-entropy degrades quickly as symmetric noise grows;
+the full method stays far above it, e.g.\ $88.3\,\%$ instead of $74.1\,\%$ on
+CIFAR-10 with $60\,\%$ noise. With asymmetric noise on CIFAR-100, the
+\emph{forward correction} method (Forward $T$) is slightly better. That
+method, however, uses the noise transition matrix $T$, i.e.\ knowledge of
+which class is mainly confused with which other class. This is information
+the negative learning approach does not need.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}llcccccc@{}}
+    \toprule
+    & & \multicolumn{3}{c}{symmetric noise} & \multicolumn{3}{c}{asymmetric
+      noise} \\
+    \cmidrule(lr){3-5}\cmidrule(l){6-8}
+    Dataset & Method & 20\,\% & 40\,\% & 60\,\% & 10\,\% & 20\,\% & 40\,\% \\
+    \midrule
+    CIFAR-10 & CE & 86.98 & 81.88 & 74.14 & 90.69 & 88.59 & 80.11 \\
+      & Forward $T$ & 88.63 & 85.07 & 79.12 & 91.32 & 90.35 & 88.12 \\
+      & SelNLPL + pseudo-labels & \textbf{94.23} & \textbf{92.43} &
+        \textbf{88.32} & \textbf{94.57} & \textbf{93.35} & \textbf{89.86} \\
+    \midrule
+    CIFAR-100 & CE & 58.72 & 48.20 & 37.41 & 66.54 & 59.20 & 42.74 \\
+      & Forward $T$ & 63.16 & 54.65 & 44.62 & \textbf{71.05} & \textbf{71.08}
+        & \textbf{70.82} \\
+      & SelNLPL + pseudo-labels & \textbf{71.52} & \textbf{66.39} &
+        \textbf{56.51} & 70.35 & 63.12 & 45.70 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Test accuracy (\%) under label noise, excerpt from the NLNL paper.
+  Negative learning wins clearly under symmetric noise. Under strong
+  asymmetric noise on CIFAR-100, forward correction wins, but it assumes a
+  known confusion matrix.}
+  \label{tab:nl-results}
+\end{table}
+
+\subsection{How Much Does Weak Supervision Really Gain?}
+
+Weakly supervised learning is an active research area, and a critical look
+at published results shows that the gains are often smaller than claimed.
+Many WSL methods silently rely on some \emph{clean} data, for example a
+clean validation set to choose hyperparameters or the stopping epoch. If
+these clean samples are available anyway, a natural baseline is to train a
+standard model, or fine-tune a pretrained one, directly on them. Such
+experiments showed that a few clean labels per class often match or beat
+WSL methods trained on thousands of weakly labeled examples. Three
+recommendations follow for evaluating any WSL approach:
+\begin{itemize}
+  \item Report how much the method relies on clean data, including clean
+    validation data for model selection.
+  \item Report how many cleanly annotated samples a few-shot approach needs
+    to reach the same performance. If thousands of weakly labeled samples
+    are worth only a handful of clean ones, WSL may not be the right
+    choice.
+  \item If the method needs extra clean data, include standard non-WSL
+    methods trained on that clean data in the comparison.
+\end{itemize}
+
+\noindent
+Table~\ref{tab:weak-summary} collects the methods of this section with
+their key idea and assumption. The assumption column is the practical
+checklist: a method only helps if its assumption holds for the data at hand.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{@{}p{3.7cm}p{5.2cm}p{4.9cm}@{}}
+    \toprule
+    Method & Key idea & Assumption / requirement \\
+    \midrule
+    Active learning & ask an oracle for the most useful labels & an expert is
+      available; query cost matters \\
+    Semi-supervised & unlabeled data shape the clusters; labels
+      name them & cluster assumption holds \\
+    Transductive & label the given unlabeled set directly & test data
+      known in advance \\
+    Multi-instance & bag positive iff one instance positive; max
+      pooling & bag-level labels; negative bags fully negative \\
+    ELR & pull predictions towards early-training targets &
+      early learning finds the true classes \\
+    Negative learning & train ``not this class'' with random complementary
+      labels & noise rate moderate; $C$ not too small \\
+    SelNLPL & filter by confidence, then PL on clean data and
+      relabel the rest & NL confidence separates clean from noisy \\
+    \bottomrule
+  \end{tabular}
+  \caption{Summary of weakly supervised methods. Each exploits a specific
+  structure in weak labels and fails when its assumption is violated.}
+  \label{tab:weak-summary}
+\end{table}
