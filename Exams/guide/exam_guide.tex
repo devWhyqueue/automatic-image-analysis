@@ -77,7 +77,7 @@
   \end{tikzpicture}\par\smallskip}
 
 \NewDocumentEnvironment{question}{+b}{\callout{questc}{Question}{#1}}{}
-\NewDocumentEnvironment{yours}{+b}{\callout{wrongc}{\ding{55}\ Your answer}{#1}}{}
+\NewDocumentEnvironment{yours}{+b}{\callout{wrongc}{\ding{55}\ Mistake}{#1}}{}
 \NewDocumentEnvironment{correct}{+b}{\callout{rightc}{\ding{51}\ Correct answer}{#1}}{}
 \NewDocumentEnvironment{why}{+b}{\callout{whyc}{Why}{#1}}{}
 \NewDocumentEnvironment{steps}{+b}{\callout{stepc}{Step by step}{#1}}{}
@@ -116,7 +116,7 @@
     {Exam Guide};
   \node[anchor=west, text=white!85!accent, font=\sffamily\Large]
     at ([xshift=2.2cm, yshift=-3.3cm]current page.north west)
-    {Automatic Image Analysis \textbullet{} learning from test-exam mistakes};
+    {Automatic Image Analysis \textbullet{} learning from exam mistakes};
   \node[anchor=west, text=white!70!accent, font=\sffamily\normalsize]
     at ([xshift=2.2cm, yshift=-4.2cm]current page.north west)
     {Every mistake turned into a rule, a procedure, and a picture};
@@ -124,64 +124,88 @@
 \vspace*{4.2cm}
 
 \sub{How to use this guide}
-Each topic follows the same pattern: the \textcolor{questc}{\textbf{question}},
-\textcolor{wrongc}{\textbf{what went wrong}}, the
+The mistakes are grouped by topic, not by exam. Each chapter collects the errors
+that belong to one subject area. Every error follows the same pattern: the
+\textcolor{questc}{\textbf{task}}, the \textcolor{wrongc}{\textbf{mistake}}, the
 \textcolor{rightc}{\textbf{correct answer}}, \textcolor{whyc}{\textbf{why}} it is
 correct, a \textcolor{stepc}{\textbf{step-by-step}} procedure that works on any
 variant of the task, and a short \textcolor{hookc}{\textbf{rule to remember}}.
-Question numbers refer to \texttt{test\_exam.md}; the same task types appear in
-the 2021 and 2022 exams.
+Chapter~\ref{sec:mc} comes first because its habits prevent errors in every
+other chapter; Chapter~\ref{sec:check} condenses everything into one checklist.
 
-\sub{Error map}
-\small
-\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X
-  >{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{2.6cm}l@{}}
-  \toprule
-  Q & Topic & Your answer & Correct & Sec. \\
-  \midrule
-  2  & Classical pipeline order & wrong order & see figure & \ref{sec:pipe} \\
-  10 & Backprop memory & c & a & \ref{sec:bp} \\
-  11 & Backprop gate rules & a, d & a & \ref{sec:bp} \\
-  12 & Bias, validation & a, b & a, b, d & \ref{sec:bias} \\
-  14 & Hough point test & c, d & a & \ref{sec:hough} \\
-  16 & R-table transform & b \ok & b & \ref{sec:rtable} \\
-  19 & More conv filters & b, c & c, d & \ref{sec:cnn} \\
-  20 & Max pooling & a, c, d & a, b, c & \ref{sec:cnn} \\
-  21 & Conv parameters & 252 & 3024 & \ref{sec:cnn} \\
-  23 & Histograms, entropy & 1.5 / 2 & see table & \ref{sec:sal} \\
-  24 & Kadir saliency & c & b & \ref{sec:sal} \\
-  27 & Backprop through time & -- & 1 & \ref{sec:bptt} \\
-  29 & Poisson MLE & -- & 4.40 & \ref{sec:mle} \\
-  30 & Bayes posterior & -- & 0.5027 & \ref{sec:bayes} \\
-  31 & Discriminant functions & b, c & c, d & \ref{sec:disc} \\
-  33 & GAN statements & last: true & last: false & \ref{sec:gan} \\
-  \bottomrule
+\sub{Contents}
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}r>{\raggedright\arraybackslash}X@{}}
+  \ref{sec:mc} & Answering multiple-choice questions \\
+  \ref{sec:pipe} & Vision tasks and the processing chain \\
+  \ref{sec:sal} & Histograms, entropy, and saliency \\
+  \ref{sec:hough} & Hough transform and template matching \\
+  \ref{sec:bayes} & Bayesian decision theory \\
+  \ref{sec:mle} & Parameter estimation \\
+  \ref{sec:nn} & Training neural networks \\
+  \ref{sec:cnn} & Convolutional networks \\
+  \ref{sec:rnn} & Recurrent networks \\
+  \ref{sec:gan} & Generative adversarial networks \\
+  \ref{sec:check} & Checklist before submitting \\
 \end{tabularx}
-\normalsize
+\end{center}
 
-% ================================================================= 1
+
+% =================================================================
 \clearpage
-\topic{General Procedure for Multiple Choice}{all questions}\label{sec:general}
+\topic{Answering Multiple-Choice Questions}{}\label{sec:mc}
 
-Most lost points came from multi-select questions: one option too many
-(Q11, Q19, Q20, Q31) or one too few (Q12). The knowledge was often there;
-the checking procedure was not.
+Most lost points came from multi-select questions: one option too many or one
+too few. The knowledge was usually there; the checking procedure was not. The
+same few traps appear again and again, so a fixed routine per option is worth
+more than any single fact.
+
+\sub{Four recurring traps}
+
+\fig{%
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    pat/.style={draw=#1, fill=#1!8, rounded corners=4pt, thick, text width=3.35cm,
+      minimum height=2.7cm, align=left, font=\sffamily\small, inner sep=6pt}]
+  \node[pat=wrongc] (p1) at (0,0) {\textcolor{wrongc}{\textbf{Only one term}}\\[2pt]
+    A risk computed from one product instead of the sum; a BPTT derivative along
+    one path instead of all.};
+  \node[pat=hookc, right=0.25cm of p1] (p2) {\textcolor{hookc}{\textbf{Absolute words}}\\[2pt]
+    ``any function'', ``always the lowest MSE'', ``fewer steps'': one
+    counterexample makes them false.};
+  \node[pat=stepc, right=0.25cm of p2] (p3) {\textcolor{stepc}{\textbf{Half the question}}\\[2pt]
+    ``true for CNNs \emph{but not} MLPs'' needs two checks. ``Underfitting'' is
+    not ``overfitting''.};
+  \node[pat=whyc, right=0.25cm of p3] (p4) {\textcolor{whyc}{\textbf{Missed a true option}}\\[2pt]
+    The last pipeline step, a second task of a system, a textbook fact that
+    looked too easy.};
+\end{tikzpicture}}}{The four traps behind most lost points. The first costs
+points in numeric tasks, the other three in multi-select tasks.}
 
 \begin{steps}
 \begin{enumerate}[leftmargin=*]
   \item \textbf{Judge every option on its own.} Cover the others and ask: ``Is
-        this sentence true by itself?'' Never stop after the first true option.
-  \item \textbf{Look for absolute words.} ``always'', ``only'',
-        ``necessarily'', ``entirely'' make a statement false in almost every case.
+        this sentence true by itself?'' Never stop after the first true option,
+        and never assume that exactly one or two options are correct.
+  \item \textbf{Look for absolute words.} For ``always'', ``only'', ``any'',
+        ``necessarily'', ``fewer'', ``lower'', search for one counterexample. One
+        is enough to make the statement false.
+  \item \textbf{Two-part questions.} ``True for A but not for B'' needs two checks
+        per option: true for A? \emph{and} false for B?
   \item \textbf{Check for swapped partner concepts} (figure below). The trap is a
         true sentence with one word exchanged for its partner.
   \item \textbf{Check that the option answers the question.} ``Higher
         abstraction'' is a true property of CNNs, but not an effect of \emph{more
         filters in one layer}.
-  \item \textbf{Numeric answers: formula first, numbers second,} then check the
+  \item \textbf{Numeric answers: formula first, numbers second.} Write the formula
+        with its $\sum$ and count the terms before inserting numbers.
+  \item \textbf{Sanity check the result.} A probability lies in $[0,1]$; a risk
+        lies between the smallest and largest loss of that action; check the
         order of magnitude.
 \end{enumerate}
 \end{steps}
+
+\sub{Partner concepts}
 
 \fig{%
 \begin{tikzpicture}[
@@ -189,22 +213,69 @@ the checking procedure was not.
       minimum width=3.6cm, minimum height=0.75cm, font=\sffamily\small},
     swap/.style={{Latex[length=2mm]}-{Latex[length=2mm]}, wrongc, thick}]
   \foreach \l/\r/\q [count=\i] in {
-      invariance/equivariance/Q20,
-      gradient/input value/Q11,
-      \# activations/\# parameters/Q10,
-      more channels (width)/more layers (depth)/Q19,
-      $x$/$y$/Q14,
-      $p(x\mid\omega)\,P(\omega)$/$P(\omega)$ alone/Q31} {
+      invariance/equivariance/pooling vs.\ conv,
+      gradient/input value/backprop nodes,
+      \# activations/\# parameters/memory,
+      more channels (width)/more layers (depth)/abstraction,
+      $x$/$y$/Hough line,
+      $p(x\mid\omega)\,P(\omega)$/$P(\omega)$ alone/discriminants,
+      data preprocessing/feature preprocessing/pipeline,
+      error size/gradient size/MSE vs.\ MAE} {
     \node[pill] (l\i) at (0,-0.95*\i) {\l};
     \node[pill] (r\i) at (6.2,-0.95*\i) {\r};
     \draw[swap] (l\i) -- node[above, font=\scriptsize\sffamily, text=wrongc] {\q} (r\i);
   }
-\end{tikzpicture}}{Partner concepts that were swapped in the test exam. When an
-option contains one of them, re-read it with the partner and decide which one
-makes the sentence true.}
+\end{tikzpicture}}{Pairs of concepts that were confused. When an option contains
+one of them, re-read it with the partner and decide which one makes the sentence
+true. The small label names the chapter where the pair matters.}
 
-% ================================================================= 2
-\topic{Classical Computer Vision Pipeline}{Q2}\label{sec:pipe}
+% =================================================================
+\clearpage
+\topic{Vision Tasks and the Processing Chain}{}\label{sec:pipe}
+
+A task is defined by what it outputs, and a pipeline stage by what goes in and
+what comes out. Every error in this chapter disappears once the output type is
+written down before choosing an answer.
+
+\sub{Which tasks does a system solve?}
+
+\begin{question}
+Basketball software: bounding boxes around players, identifies name and number,
+describes the action (dribbling, throwing, defense).
+\end{question}
+\begin{yours}
+Only Action Recognition.
+\end{yours}
+\begin{correct}
+Object Recognition \emph{and} Action Recognition.
+\end{correct}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item List every output the system produces: box, name/number, action.
+  \item Map each output to a task with the table below.
+  \item Tick \textbf{every} task that owns one of the outputs. A system usually
+        combines several tasks.
+\end{enumerate}
+\centering\small
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  Output & Task & Here? \\
+  \midrule
+  one label for the whole image & object classification & \bad{} no \\
+  box + \emph{which specific} player (name, number) & object recognition (identity) & \ok \\
+  one class per pixel & semantic segmentation & \bad{} no pixel map \\
+  verb over time (dribbling) & action recognition & \ok \\
+  \bottomrule
+\end{tabular}
+\end{steps}
+
+\begin{hook}
+\textbf{Classification} $=$ which \emph{category} (``a player''). \textbf{Recognition}
+$=$ which \emph{individual} (``player 23, Smith'').
+\end{hook}
+
+\sub{Order of the processing chain}
 
 \begin{question}
 Bring Data Preprocessing, Feature Selection, Feature Extraction, Feature
@@ -263,423 +334,95 @@ Everything in pixel space comes first; everything that needs labels comes last.}
 \textbf{P}repare $\to$ \textbf{C}lassify $\to$ \textbf{P}ost.
 \end{hook}
 
-% ================================================================= 3
-\topic{Backpropagation}{Q10, Q11}\label{sec:bp}
+\sub{Histogram matching is data preprocessing}
 
-\sub{Memory consumption (Q10)}
+\begin{question}
+Images taken under different illumination are transformed so that all
+histograms have approximately the same distribution. Which pipeline stage is
+this?
+\end{question}
 
 \begin{yours}
-``Memory is proportional to the number of trainable parameters.''
+Feature preprocessing.
 \end{yours}
 \begin{correct}
-``Memory is proportional to the combined output dimensionalities of the nodes in
-the network.''
+Data preprocessing.
 \end{correct}
 
 \begin{why}
-The backward pass needs, at every node, the value that node produced in the
-forward pass: the input $x$ for the derivative of $w\cdot x$, the ReLU input to
-know whether it was active. All these \textbf{activations} are stored until the
-backward pass. Their number is the sum of the output sizes of all nodes (times the
-batch size). Convolutional layers have few parameters but huge outputs, so
-parameter count and memory are not proportional.
+The method changes pixel values so that all images get a similar histogram.
+Input: image. Output: image. That is the signature of data preprocessing
+(pixel space). Feature preprocessing also ``normalizes'', but it acts on
+\emph{feature vectors} after feature extraction, for example scaling each
+feature to zero mean and unit variance. The word ``normalize'' is the trap; the
+input/output type decides.
 \end{why}
 
-\fig{%
-\begin{tikzpicture}
-\begin{axis}[
-    ybar, bar width=1.4cm, width=0.62\linewidth, height=5.2cm,
-    ymode=log, ymin=100, ymax=3e7, log origin=infty,
-    symbolic x coords={Parameters, Stored activations},
-    xtick=data, enlarge x limits=0.5,
-    ylabel={count (log scale)},
-    tick label style={font=\sffamily\small},
-    label style={font=\sffamily\small},
-    nodes near coords, every node near coord/.append style={font=\sffamily\small},
-    point meta=explicit symbolic, axis lines*=left, ymajorgrids,
-    grid style={black!10}]
-  \addplot[fill=whyc!60, draw=whyc] coordinates
-    {(Parameters,1792) [1\,792] (Stored activations,3211264) [3\,211\,264]};
-\end{axis}
-\end{tikzpicture}}{One $3\times3$ convolution, $3\to64$ channels, on a
-$224\times224$ image: under two thousand parameters, but over three million
-output values that must be kept for the backward pass (per image).}
+\begin{hook}
+Ask: \emph{what comes out?} Image $\Rightarrow$ data preprocessing. Feature vector
+$\Rightarrow$ extraction or feature preprocessing. Label $\Rightarrow$ classifier
+or postprocessing.
+\end{hook}
 
-Also: one update step needs exactly \textbf{one} forward and \textbf{one}
-backward pass. Options with ``multiple passes'' are false.
+\sub{From classifier to detector: four steps}
 
-\sub{Gate rules (Q11)}
-
+\begin{question}
+A classifier works for one fixed image resolution. Which steps turn it into an
+object detector?
+\end{question}
 \begin{yours}
-Ticked ``Addition nodes backpropagate their inputs''.
+Sliding window, image pyramid, and boxes from scale and response were ticked;
+non-maxima suppression was missed.
 \end{yours}
-\begin{correct}
-Only ``Backpropagation allows for efficient optimization of computational graphs
-with gradient descent''.
-\end{correct}
 
 \fig{%
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
-    gate/.style={circle, draw=accent, fill=accent!8, thick, minimum size=0.9cm,
-      font=\sffamily\bfseries},
-    fwd/.style={-{Latex[length=2mm]}, rightc!80!black, thick},
-    bwd/.style={-{Latex[length=2mm]}, wrongc, thick, dashed},
-    val/.style={font=\sffamily\small, text=rightc!80!black},
-    grd/.style={font=\sffamily\small, text=wrongc}]
-  \foreach \op/\name/\z/\gx/\gy/\rl [count=\i] in {
-      +/add/2/2/2/{distributes},
-      $\times$/mul/-3/-2/6/{switches inputs},
-      max/max/3/2/0/{routes}} {
-    \begin{scope}[xshift=(\i-1)*5.2cm]
-      \node[gate] (g) at (0,0) {\op};
-      \node[val] (x) at (-2,0.8) {$x=3$};
-      \node[val] (y) at (-2,-0.8) {$y=-1$};
-      \node[val] (z) at (1.9,0) {$z=\z$};
-      \draw[fwd] (x.east) -- (g);
-      \draw[fwd] (y.east) -- (g);
-      \draw[fwd] (g) -- (z);
-      \draw[bwd] ([yshift=-3pt]z.south west) to[bend left=25] ([yshift=-3pt]g.south east);
-      \node[grd, anchor=north] at ([yshift=-4pt]z.south) {$g=2$};
-      \node[grd] at (-1.1,1.25) {$\partial x = \gx$};
-      \node[grd] at (-1.1,-1.25) {$\partial y = \gy$};
-      \node[font=\sffamily\small\bfseries, text=accent] at (0,-2) {\rl};
-    \end{scope}}
-\end{tikzpicture}}{Forward values (green) and backward gradients (red) for the
-same inputs $x=3$, $y=-1$ and upstream gradient $g=2$. Only the multiplication
-node uses the input values, and it swaps them: $\partial x = g\cdot y$,
-$\partial y = g\cdot x$.}
-
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-  \toprule
-  Node & Forward & Backward (upstream gradient $g$) \\
-  \midrule
-  Addition $z=x+y$ & sum & $\partial x = g$, $\partial y = g$ \quad (copy the gradient) \\
-  Multiplication $z=xy$ & product & $\partial x = g\,y$, $\partial y = g\,x$ \quad (swap the inputs) \\
-  Max $z=\max(x,y)$ & maximum & $g$ to the larger input, $0$ to the other \\
-  \bottomrule
-\end{tabular}
-\end{center}
-
-\begin{why}
-The addition node passes on the \emph{gradient}, never its inputs.
-Backpropagation also does \emph{not} reduce SGD noise (that comes from
-mini-batches) and does \emph{not} guarantee the optimum (the loss is non-convex).
-It only computes the exact gradient efficiently.
-\end{why}
-
-% ================================================================= 4
-\topic{Bias, Variance, and Model Complexity}{Q12}\label{sec:bias}
-
-\begin{yours}
-a, b \quad(missed d: ``A model with high bias tends to underfit the data.'')
-\end{yours}
-
-\fig{%
-\begin{tikzpicture}
-\begin{axis}[
-    width=0.8\linewidth, height=6cm, domain=0.5:9, samples=100,
-    xlabel={model complexity}, ylabel={error}, ymin=0, ymax=1.4,
-    xtick=\empty, ytick=\empty, axis lines=left,
-    label style={font=\sffamily\small},
-    legend style={font=\sffamily\small, draw=none, at={(0.98,0.98)}, anchor=north east}]
-  \fill[whyc!8] (axis cs:0.5,0) rectangle (axis cs:3.2,1.4);
-  \fill[wrongc!8] (axis cs:5.8,0) rectangle (axis cs:9,1.4);
-  \addplot[thick, rightc] {1.3*exp(-0.45*x)+0.03};
-  \addplot[thick, hookc] {1.3*exp(-0.45*x)+0.03+0.012*x^2};
-  \legend{training error, validation error}
-  \node[font=\sffamily\small, text=whyc, align=center] at (axis cs:1.85,1.25)
-    {underfitting\\high bias};
-  \node[font=\sffamily\small, text=wrongc, align=center] at (axis cs:7.4,0.35)
-    {overfitting\\high variance};
-  \draw[dashed, black!50] (axis cs:4.5,0) -- (axis cs:4.5,1.4);
-  \node[font=\sffamily\scriptsize, text=black!60, rotate=90, anchor=south]
-    at (axis cs:4.5,0.7) {best model};
-\end{axis}
-\end{tikzpicture}}{Training error always falls with complexity. Validation error
-falls, then rises again. High bias sits on the left (both errors high), high
-variance on the right (small training, large validation error).}
-
-\begin{center}\small
-\begin{tabularx}{\linewidth}{@{}Xcp{6.3cm}@{}}
-  \toprule
-  Statement & True? & Reason \\
-  \midrule
-  Small training error $\Rightarrow$ sufficient complexity & \ok & the model is
-    flexible enough to fit the data \\
-  Small validation error $\Rightarrow$ good performance & \ok & unseen data
-    estimates generalization \\
-  Small training error $\Rightarrow$ good performance & \bad & the model could
-    overfit (right side of the plot) \\
-  High bias $\Rightarrow$ underfitting & \ok & too simple, it misses even the
-    training data (left side) \\
-  \bottomrule
-\end{tabularx}
-\end{center}
+    stage/.style={draw, rounded corners=3pt, align=center, minimum width=2.7cm,
+      minimum height=1.1cm, font=\sffamily\small, line width=0.7pt},
+    arr/.style={-{Latex[length=2.4mm]}, thick, black!60}]
+  \node[stage, draw=whyc, fill=whyc!10] (s1) {1.~sliding\\window};
+  \node[stage, draw=whyc, fill=whyc!10, right=0.55cm of s1] (s2) {2.~image\\pyramid};
+  \node[stage, draw=rightc, fill=rightc!10, right=0.55cm of s2] (s3) {3.~box from\\scale + position};
+  \node[stage, draw=hookc, fill=hookc!12, right=0.55cm of s3] (s4) {4.~non-maxima\\suppression};
+  \foreach \a/\b in {s1/s2, s2/s3, s3/s4} \draw[arr] (\a) -- (\b);
+  % NMS illustration
+  \begin{scope}[shift={($(s4.south)+(-1.9,-2.6)$)}]
+    \draw[wrongc, thick] (0,0) rectangle (1.2,1.6);
+    \draw[wrongc, thick] (0.2,0.15) rectangle (1.4,1.75);
+    \draw[wrongc, thick] (-0.15,-0.1) rectangle (1.05,1.45);
+    \node[font=\sffamily\scriptsize, text=wrongc] at (0.6,-0.4) {3 overlapping boxes};
+    \draw[arr] (1.7,0.8) -- (2.5,0.8);
+    \draw[rightc, very thick] (2.8,0.15) rectangle (4.0,1.75);
+    \node[font=\sffamily\scriptsize, text=rightc] at (3.4,-0.4) {keep the strongest};
+  \end{scope}
+\end{tikzpicture}}}{A fixed-size classifier becomes a detector in four steps.
+Neighboring windows and pyramid levels all fire on the same object, so without
+step 4 one player produces a cluster of boxes.}
 
 \begin{hook}
-\textbf{B}ias $=$ \textbf{B}elow the data (underfit). \quad
-\textbf{V}ariance $=$ \textbf{V}olatile, fits the noise (overfit).
+Detector $=$ \textbf{slide}, \textbf{scale}, \textbf{box}, \textbf{suppress}.
+All four belong to the answer.
 \end{hook}
 
-% ================================================================= 5
-\topic{Hough Transform: Point on a Line}{Q14}\label{sec:hough}
+% =================================================================
+\clearpage
+\topic{Histograms, Entropy, and Saliency}{}\label{sec:sal}
+
+Entropy is computed from the histogram alone, and the histogram forgets where
+the pixels are. Both mistakes in this chapter come from forgetting one of these
+two facts: either the spatial arrangement was taken into account where it does
+not matter, or saliency was reduced to entropy where scale does matter.
+
+\sub{Matching histograms and entropy values}
 
 \begin{question}
-Which lines $(\theta,\rho)$ pass through $(x,y)=(2,10)$? \
-Options: $(0,2)$, $(0.75\pi,-10)$, $(0,10)$, $(0.5\pi,2)$.
+Four black-and-white patches: assign each its histogram and its entropy value.
 \end{question}
 \begin{yours}
-$(0,10)$ and $(0.5\pi,2)$ \quad --- the roles of $x$ and $y$ were swapped.
+One pair was swapped: two patches with mirrored histograms (mostly white vs.\
+mostly black) were exchanged.
 \end{yours}
-\begin{correct}
-Only $(\theta,\rho)=(0,2)$.
-\end{correct}
-
-\fig{%
-\begin{minipage}{0.47\linewidth}\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=0.95\linewidth, height=6.2cm,
-    xmin=-2, xmax=16, ymin=-3, ymax=13, axis lines=left,
-    xlabel={$x$}, ylabel={$y$}, xtick={0,2,10}, ytick={0,2,10},
-    tick label style={font=\scriptsize}, label style={font=\small},
-    title={\sffamily\small image space},
-    legend style={font=\scriptsize, draw=none, at={(0.5,-0.22)}, anchor=north},
-    legend columns=2, legend cell align=left]
-  \addplot[very thick, rightc] coordinates {(2,-3) (2,13)};
-  \addplot[thick, wrongc, dashed] coordinates {(10,-3) (10,13)};
-  \addplot[thick, stepc, dashed] coordinates {(-2,2) (16,2)};
-  \addplot[thick, hookc, dashed, domain=11.142:16] {x-14.142};
-  \legend{{$(0,2)$: $x=2$}, {$(0,10)$: $x=10$}, {$(\frac{\pi}{2},2)$: $y=2$},
-    {$(\frac{3\pi}{4},-10)$}}
-  \addplot[only marks, mark=*, mark size=2.8pt, accent, forget plot] coordinates {(2,10)};
-  \node[font=\scriptsize, text=accent, anchor=west] at (axis cs:2.4,10) {$(2,10)$};
-\end{axis}
-\end{tikzpicture}
-\end{minipage}\hfill
-\begin{minipage}{0.5\linewidth}\centering
-\begin{tikzpicture}
-\begin{axis}[
-    width=0.95\linewidth, height=6.2cm, clip=false,
-    xmin=0, xmax=180, ymin=-12, ymax=12, domain=0:180, samples=120,
-    xlabel={$\theta$ [deg]}, ylabel={$\rho$}, xtick={0,45,90,135,180},
-    axis lines=left, tick label style={font=\scriptsize},
-    label style={font=\small}, title={\sffamily\small Hough space}]
-  \addplot[thick, accent] {2*cos(x)+10*sin(x)};
-  \addplot[only marks, mark=*, mark size=2.5pt, rightc] coordinates {(0,2)};
-  \addplot[only marks, mark=x, mark size=4pt, very thick, wrongc]
-    coordinates {(0,10) (90,2) (135,-10)};
-  \draw[black!30] (axis cs:0,0) -- (axis cs:180,0);
-  \node[font=\scriptsize\sffamily, text=accent, anchor=north] at (axis cs:100,8.4) {$\rho = 2\cos\theta + 10\sin\theta$};
-  \node[font=\scriptsize\sffamily, text=rightc, anchor=west] at (axis cs:4,1.2) {$(0,2)$};
-  \node[font=\scriptsize\sffamily, text=wrongc, anchor=west] at (axis cs:4,9.6) {$(0,10)$};
-  \node[font=\scriptsize\sffamily, text=wrongc, anchor=north] at (axis cs:90,1.6) {$(90^\circ,2)$};
-  \node[font=\scriptsize\sffamily, text=wrongc, anchor=east] at (axis cs:131,-10) {$(135^\circ,-10)$};
-\end{axis}
-\end{tikzpicture}
-\end{minipage}}{Left: the four candidate lines; only $x=2$ passes through the
-point. Right: in Hough space the point becomes a sinusoid; a line passes through
-the point exactly when its $(\theta,\rho)$ lies on the curve.}
-
-\begin{steps}
-\begin{enumerate}[leftmargin=*]
-  \item Write the line equation: $\boxed{\rho = x\cos\theta + y\sin\theta}$.
-  \item Insert the point: $\rho(\theta) = 2\cos\theta + 10\sin\theta$.
-  \item Evaluate every option and compare with the given $\rho$:
-\end{enumerate}
-\centering\small
-\begin{tabular}{@{}cccccc@{}}
-  \toprule
-  Option & $\cos\theta$ & $\sin\theta$ & $2\cos\theta+10\sin\theta$ & given $\rho$ & \\
-  \midrule
-  $(0,2)$ & $1$ & $0$ & $2$ & $2$ & \ok \\
-  $(0.75\pi,-10)$ & $-0.707$ & $0.707$ & $5.66$ & $-10$ & \bad \\
-  $(0,10)$ & $1$ & $0$ & $2$ & $10$ & \bad \\
-  $(0.5\pi,2)$ & $0$ & $1$ & $10$ & $2$ & \bad \\
-  \bottomrule
-\end{tabular}
-\end{steps}
-
-\begin{hook}
-$\theta=0$: $\rho = x$, the line is \textbf{vertical} ($x=\rho$). \quad
-$\theta=\pi/2$: $\rho = y$, the line is \textbf{horizontal} ($y=\rho$).
-Always compute; never match numbers by eye.
-\end{hook}
-
-% ================================================================= 6
-\topic{Generalized Hough Transform: R-Table}{Q16}\label{sec:rtable}
-
-Answered correctly (b). The reasoning below keeps it reproducible for other
-scales, angles, and table ranges.
-
-\begin{question}
-Transform the R-table with scale $s=2$ and a counter-clockwise rotation of
-$\varphi=180^\circ$. Rows: $[0,45)$: $(1,2);(3,4)$ \quad $[45,90)$: -- \quad
-$[90,135)$: $(5,6);(7,8)$ \quad $[135,180)$: $(9,10)$.
-\end{question}
-
-\fig{%
-\begin{minipage}{0.48\linewidth}\centering
-\begin{tikzpicture}[scale=0.62,
-    vec/.style={-{Latex[length=2.2mm]}, very thick}]
-  \draw[black!15] (-4.5,-4.5) grid (4.5,4.5);
-  \draw[-{Latex[length=1.6mm]}, black!50] (-4.7,0) -- (4.8,0) node[right, font=\scriptsize] {$x$};
-  \draw[-{Latex[length=1.6mm]}, black!50] (0,-4.7) -- (0,4.8) node[above, font=\scriptsize] {$y$};
-  \draw[vec, accent] (0,0) -- (1,2) node[above right, font=\scriptsize] {$(1,2)$};
-  \draw[vec, rightc] (0,0) -- (-2,-4);
-  \draw[vec, hookc] (0,0) -- (-1,-2);
-  \node[font=\scriptsize, text=hookc, anchor=west, fill=white, inner sep=1pt] at (-0.7,-2.1) {1.~rotate: $(-1,-2)$};
-  \node[font=\scriptsize, text=rightc, anchor=west, fill=white, inner sep=1pt] at (-1.7,-4.1) {2.~scale: $(-2,-4)$};
-  \draw[hookc, -{Latex[length=1.6mm]}] (0.9,0.5) arc (27:207:1) ;
-  \node[font=\scriptsize, text=hookc, fill=white, inner sep=1pt] at (-1.5,1.3) {$180^\circ$};
-\end{tikzpicture}\par\small displacement vectors
-\end{minipage}\hfill
-\begin{minipage}{0.48\linewidth}\centering
-\begin{tikzpicture}[scale=0.62]
-  \draw[black!40] (0,0) circle (3);
-  \foreach \a in {0,45,90,135} {
-    \draw[black!25] (0,0) -- (\a:3.3);
-    \draw[black!25] (0,0) -- (\a+180:3.3);
-  }
-  \foreach \a/\l in {22.5/{[0,45)}, 67.5/{[45,90)}, 112.5/{[90,135)}, 157.5/{[135,180)}} {
-    \node[font=\scriptsize, text=accent] at (\a:3.9) {\l};
-    \node[font=\scriptsize, text=accent] at (\a+180:3.9) {\l};
-  }
-  \draw[-{Latex[length=2.2mm]}, very thick, accent] (0,0) -- (20:2.6) node[pos=0.55, above, font=\scriptsize] {$\theta$};
-  \draw[-{Latex[length=2.2mm]}, very thick, rightc] (0,0) -- (200:2.6) node[pos=0.75, below=2pt, font=\scriptsize, fill=white, inner sep=1pt] {$\theta+180^\circ$};
-\end{tikzpicture}\par\small gradient orientation modulo $180^\circ$
-\end{minipage}}{Left: rotating by $180^\circ$ negates each displacement, scaling
-by $2$ doubles it. Right: a gradient direction rotated by $180^\circ$ lies on the
-same line, so with a table over $[0^\circ,180^\circ)$ it stays in its row.}
-
-\begin{steps}
-\begin{enumerate}[leftmargin=*]
-  \item \textbf{Scale}: multiply every displacement by $s$. Rows stay, since
-        scaling does not change gradient directions.
-  \item \textbf{Rotate the vectors} by $\varphi$. For $180^\circ$:
-        $(d_x,d_y)\mapsto(-d_x,-d_y)$.
-  \item \textbf{Rotate the rows}: every entry moves to the row for $\theta+\varphi$.
-        Check the table range! Over $[0^\circ,180^\circ)$, orientations are taken
-        modulo $180^\circ$, so $\theta+180^\circ\equiv\theta$: nothing moves.
-  \item Result: $(1,2)\to(-2,-4)$, $(3,4)\to(-6,-8)$, $(5,6)\to(-10,-12)$,
-        $(7,8)\to(-14,-16)$, $(9,10)\to(-18,-20)$; rows unchanged. $\Rightarrow$ \textbf{b}.
-\end{enumerate}
-\end{steps}
-
-\begin{hook}
-Distractors: only shifted rows (a), swapped components $=$ reflection (c),
-unchanged (d). If the table covers $[0^\circ,360^\circ)$, a $180^\circ$ rotation
-\emph{does} move rows. Translation never changes an R-table.
-\end{hook}
-
-% ================================================================= 7
-\topic{CNN Layers}{Q19, Q20, Q21}\label{sec:cnn}
-
-\sub{Number of weights (Q21)}
-
-\begin{yours}
-$252 = 3\cdot3\cdot28$ \quad --- the input channels were forgotten.
-\end{yours}
-\begin{correct}
-$3\cdot3\cdot12\cdot28 = 3024$
-\end{correct}
-
-\fig{%
-\begin{tikzpicture}[x={(1cm,0)}, y={(0,1cm)}]
-  \cuboid{0}{0}{3}{3}{1.3}{whyc}
-  \node[font=\sffamily\small, align=center] at (1.9,-0.55) {input\\$32\times32\times\mathbf{12}$};
-  \cuboid{1.9}{1.6}{0.45}{0.45}{1.3}{hookc}
-  \cuboid{5.2}{1.1}{0.6}{0.6}{1.3}{hookc}
-  \node[font=\sffamily\small, align=center] at (5.9,-0.55) {one filter\\$3\times3\times\mathbf{12}$};
-  \node[font=\sffamily\bfseries, text=hookc] at (7.3,1.8) {$\times\,28$};
-  \cuboid{8.6}{0.4}{1.6}{1.6}{2.6}{rightc}
-  \node[font=\sffamily\small, align=center] at (10.2,-0.55) {output\\$16\times16\times\mathbf{28}$};
-  \draw[-{Latex[length=2mm]}, thick, black!50] (4.1,1.8) -- (5.0,1.8);
-\end{tikzpicture}}{Every filter spans the \emph{full input depth}
-($3\times3\times12 = 108$ weights). One filter produces one output channel, so
-$28$ filters are needed. The spatial sizes ($32\to16$) do not enter the count;
-they only reveal the stride.}
-
-\begin{steps}
-\[
-\#\text{weights} = K_h\cdot K_w\cdot C_\text{in}\cdot C_\text{out}
- = 3\cdot3\cdot12\cdot28 = 3024,
-\qquad \#\text{biases} = C_\text{out} = 28 .
-\]
-Stride (Q22): $W_\text{out} = \left\lfloor \frac{W_\text{in}+2P-K}{S}\right\rfloor + 1$.
-Halving the size ($148\to74$ with $K=3$, $P=1$) means $S=2$.
-\end{steps}
-
-\sub{More filters in one layer (Q19)}
-
-\begin{yours}
-Ticked ``Higher abstraction capabilities of the layer''.
-\end{yours}
-\begin{correct}
-Increase in output dimensionality; increased number of features the layer can
-respond to.
-\end{correct}
-
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-  \toprule
-  Change & What it adds & Abstraction? \\
-  \midrule
-  More filters (\textbf{width}) & more output channels $=$ more feature detectors
-    at the same level & \bad \\
-  More layers (\textbf{depth}) & larger receptive field, features of features & \ok \\
-  \bottomrule
-\end{tabular}
-\end{center}
-
-\sub{Effects of max pooling (Q20)}
-
-\begin{yours}
-Ticked ``Translation equivariance'' instead of ``Translation invariance''.
-\end{yours}
-\begin{correct}
-Dimensionality reduction, translation invariance, loss of spatial/relational
-information.
-\end{correct}
-
-\fig{%
-\begin{tikzpicture}[scale=0.5]
-  \poolgrid{0}{0}{0}{0}
-  \node[font=\sffamily\small] at (2,-0.8) {input};
-  \draw[-{Latex[length=2mm]}, thick] (4.4,2) -- node[above, font=\sffamily\scriptsize] {max pool} (7.1,2);
-  \draw[black!40] (7.5,1) grid ++(2,2);
-  \fill[hookc!60] (7.5,2) rectangle ++(1,1);
-  \draw[black!40] (7.5,1) grid ++(2,2);
-  \draw[accent, very thick] (7.5,1) rectangle ++(2,2);
-  \node[font=\sffamily\small\bfseries] at (8,2.5) {9};
-  \poolgrid{13}{0}{1}{1}
-  \node[font=\sffamily\small] at (15,-0.8) {shifted by one pixel};
-  \draw[-{Latex[length=2mm]}, thick] (17.4,2) -- node[above, font=\sffamily\scriptsize] {max pool} (20.1,2);
-  \draw[black!40] (20.5,1) grid ++(2,2);
-  \fill[hookc!60] (20.5,2) rectangle ++(1,1);
-  \draw[black!40] (20.5,1) grid ++(2,2);
-  \draw[accent, very thick] (20.5,1) rectangle ++(2,2);
-  \node[font=\sffamily\small\bfseries] at (21,2.5) {9};
-  \node[font=\sffamily\small, text=rightc] at (21.5,-0.8) {same output};
-\end{tikzpicture}}{A small shift inside a $2\times2$ pooling block does not change
-the pooled output: \textbf{invariance}. The price is that the exact position is
-lost. An \emph{equivariant} operation (convolution) would shift its output along
-with the input.}
-
-\begin{hook}
-\textbf{Conv $=$ Equivariant} (output moves with the input). \quad
-\textbf{Pool $=$ Invariant} (output stays).
-\end{hook}
-
-% ================================================================= 8
-\topic{Histograms, Entropy, and Saliency}{Q23, Q24}\label{sec:sal}
-
-\sub{Matching histograms and entropy values (Q23)}
-
-The task had 8 drag-and-drop placements (4 histograms, then 4 entropy values),
-each worth $0.25$ points. A score of $1.5/2$ means two wrong placements, typically
-\textbf{one swapped pair}.
 
 \fig{%
 \begin{tikzpicture}[
@@ -754,13 +497,70 @@ have mirrored histograms but the same entropy.}
 \end{tikzpicture}}{Binary entropy is symmetric: $25\,\%$ black and $75\,\%$ black
 give the same $0.81$ bit.}
 
-\sub{Most salient patch after Kadir et al.\ (Q24)}
+\sub{Swapping two grey values keeps the entropy}
 
+\begin{question}
+Which statements about entropy are true? (Uniform histogram, swapping two
+colors, permuting pixels, homogeneous patch vs.\ edge.)
+\end{question}
 \begin{yours}
-c (the patch with the highest entropy).
+Only ``uniform histogram $\Rightarrow$ highest entropy'' was ticked; ``swapping
+two colors does not change the entropy'' was missed.
+\end{yours}
+
+\fig{%
+\begin{tikzpicture}[bar/.style={draw=black!70, minimum width=0.55cm, anchor=south}]
+  \foreach \h/\col/\x in {1.8/accent/0, 0.6/hookc/0.8, 1.0/questc/1.6} {
+    \fill[\col!60, draw=black!60] (\x,0) rectangle ++(0.55,\h);}
+  \draw[-{Latex[length=1.5mm]}] (-0.2,0) -- (2.5,0);
+  \node[font=\sffamily\scriptsize] at (0.275,-0.3) {$I_1$};
+  \node[font=\sffamily\scriptsize] at (1.075,-0.3) {$I_2$};
+  \node[font=\sffamily\scriptsize] at (1.875,-0.3) {$I_3$};
+  \node[font=\sffamily\small] at (1.15,2.3) {before};
+  \draw[-{Latex[length=2.2mm]}, thick] (2.9,0.9) -- node[above, font=\sffamily\scriptsize] {swap $I_1\leftrightarrow I_2$} (5.1,0.9);
+  \begin{scope}[xshift=5.6cm]
+  \foreach \h/\col/\x in {0.6/hookc/0, 1.8/accent/0.8, 1.0/questc/1.6} {
+    \fill[\col!60, draw=black!60] (\x,0) rectangle ++(0.55,\h);}
+  \draw[-{Latex[length=1.5mm]}] (-0.2,0) -- (2.5,0);
+  \node[font=\sffamily\scriptsize] at (0.275,-0.3) {$I_1$};
+  \node[font=\sffamily\scriptsize] at (1.075,-0.3) {$I_2$};
+  \node[font=\sffamily\scriptsize] at (1.875,-0.3) {$I_3$};
+  \node[font=\sffamily\small] at (1.15,2.3) {after};
+  \end{scope}
+  \node[font=\sffamily\small, text=rightc, align=left, anchor=west] at (8.6,0.9)
+    {same bar heights\\$\Rightarrow$ same $H$};
+\end{tikzpicture}}{Entropy $H=-\sum_k p_k\log_2 p_k$ is a sum over the bar
+heights. Swapping two grey values moves two bars but keeps the same set of
+heights, so every term of the sum survives.}
+
+\begin{center}\small
+\begin{tabular}{@{}lcl@{}}
+  \toprule
+  Statement & True? & Reason \\
+  \midrule
+  uniform histogram $\Rightarrow$ highest entropy & \ok & flattest possible distribution \\
+  swap two colors $\Rightarrow$ entropy unchanged & \ok & same heights, other positions \\
+  permute pixels $\Rightarrow$ entropy changes & \bad & histogram unchanged \\
+  homogeneous patch $>$ edge patch & \bad & homogeneous $H=0$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{hook}
+Entropy only sees the \textbf{list of bar heights}. Any change that keeps this
+list (relabel colors, shuffle pixels, rotate, mirror) keeps $H$.
+\end{hook}
+
+\sub{Most salient patch after Kadir et al.}
+
+\begin{question}
+Which of the four patches above is the most salient after Kadir and Brady?
+\end{question}
+\begin{yours}
+Patch c, the checkerboard, because it has the highest entropy.
 \end{yours}
 \begin{correct}
-b (the black disk).
+Patch b, the black disk.
 \end{correct}
 
 \begin{why}
@@ -814,11 +614,1228 @@ the window just encloses it; there the histogram changes fastest.}
 \begin{hook}
 Kadir saliency favors \textbf{isolated blobs with a characteristic scale}, not
 the maximum-entropy patch. Entropy alone is insufficient because the intensity
-distribution contains \textbf{no spatial information} (Q25).
+distribution contains \textbf{no spatial information}.
 \end{hook}
 
-% ================================================================= 9
-\topic{Backpropagation Through Time}{Q27}\label{sec:bptt}
+% =================================================================
+\clearpage
+\topic{Hough Transform and Template Matching}{}\label{sec:hough}
+
+All line-detection tasks rest on one equation, $\rho = x\cos\theta +
+y\sin\theta$. The mistakes came from matching numbers by eye instead of
+inserting them, and from forgetting how much a known gradient constrains a
+vote. Template matching by correlation closes the chapter.
+
+\sub{Does a line pass through a point?}
+
+\begin{question}
+Which lines $(\theta,\rho)$ pass through $(x,y)=(2,10)$? \
+Candidates: $(0,2)$, $(0.75\pi,-10)$, $(0,10)$, $(0.5\pi,2)$.
+\end{question}
+\begin{yours}
+$(0,10)$ and $(0.5\pi,2)$: the roles of $x$ and $y$ were swapped.
+\end{yours}
+\begin{correct}
+Only $(\theta,\rho)=(0,2)$.
+\end{correct}
+
+\fig{%
+\begin{minipage}{0.47\linewidth}\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.95\linewidth, height=6.2cm,
+    xmin=-2, xmax=16, ymin=-3, ymax=13, axis lines=left,
+    xlabel={$x$}, ylabel={$y$}, xtick={0,2,10}, ytick={0,2,10},
+    tick label style={font=\scriptsize}, label style={font=\small},
+    title={\sffamily\small image space},
+    legend style={font=\scriptsize, draw=none, at={(0.5,-0.22)}, anchor=north},
+    legend columns=2, legend cell align=left]
+  \addplot[very thick, rightc] coordinates {(2,-3) (2,13)};
+  \addplot[thick, wrongc, dashed] coordinates {(10,-3) (10,13)};
+  \addplot[thick, stepc, dashed] coordinates {(-2,2) (16,2)};
+  \addplot[thick, hookc, dashed, domain=11.142:16] {x-14.142};
+  \legend{{$(0,2)$: $x=2$}, {$(0,10)$: $x=10$}, {$(\frac{\pi}{2},2)$: $y=2$},
+    {$(\frac{3\pi}{4},-10)$}}
+  \addplot[only marks, mark=*, mark size=2.8pt, accent, forget plot] coordinates {(2,10)};
+  \node[font=\scriptsize, text=accent, anchor=west] at (axis cs:2.4,10) {$(2,10)$};
+\end{axis}
+\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}{0.5\linewidth}\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.95\linewidth, height=6.2cm, clip=false,
+    xmin=0, xmax=180, ymin=-12, ymax=12, domain=0:180, samples=120,
+    xlabel={$\theta$ [deg]}, ylabel={$\rho$}, xtick={0,45,90,135,180},
+    axis lines=left, tick label style={font=\scriptsize},
+    label style={font=\small}, title={\sffamily\small Hough space}]
+  \addplot[thick, accent] {2*cos(x)+10*sin(x)};
+  \addplot[only marks, mark=*, mark size=2.5pt, rightc] coordinates {(0,2)};
+  \addplot[only marks, mark=x, mark size=4pt, very thick, wrongc]
+    coordinates {(0,10) (90,2) (135,-10)};
+  \draw[black!30] (axis cs:0,0) -- (axis cs:180,0);
+  \node[font=\scriptsize\sffamily, text=accent, anchor=north] at (axis cs:100,8.4) {$\rho = 2\cos\theta + 10\sin\theta$};
+  \node[font=\scriptsize\sffamily, text=rightc, anchor=west] at (axis cs:4,1.2) {$(0,2)$};
+  \node[font=\scriptsize\sffamily, text=wrongc, anchor=west] at (axis cs:4,9.6) {$(0,10)$};
+  \node[font=\scriptsize\sffamily, text=wrongc, anchor=north] at (axis cs:90,1.6) {$(90^\circ,2)$};
+  \node[font=\scriptsize\sffamily, text=wrongc, anchor=east] at (axis cs:131,-10) {$(135^\circ,-10)$};
+\end{axis}
+\end{tikzpicture}
+\end{minipage}}{Left: the four candidate lines; only $x=2$ passes through the
+point. Right: in Hough space the point becomes a sinusoid; a line passes through
+the point exactly when its $(\theta,\rho)$ lies on the curve.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Write the line equation: $\boxed{\rho = x\cos\theta + y\sin\theta}$.
+  \item Insert the point: $\rho(\theta) = 2\cos\theta + 10\sin\theta$.
+  \item Evaluate every candidate and compare with the given $\rho$:
+\end{enumerate}
+\centering\small
+\begin{tabular}{@{}cccccc@{}}
+  \toprule
+  Candidate & $\cos\theta$ & $\sin\theta$ & $2\cos\theta+10\sin\theta$ & given $\rho$ & \\
+  \midrule
+  $(0,2)$ & $1$ & $0$ & $2$ & $2$ & \ok \\
+  $(0.75\pi,-10)$ & $-0.707$ & $0.707$ & $5.66$ & $-10$ & \bad \\
+  $(0,10)$ & $1$ & $0$ & $2$ & $10$ & \bad \\
+  $(0.5\pi,2)$ & $0$ & $1$ & $10$ & $2$ & \bad \\
+  \bottomrule
+\end{tabular}
+\end{steps}
+
+\begin{hook}
+$\theta=0$: $\rho = x$, the line is \textbf{vertical} ($x=\rho$). \quad
+$\theta=\pi/2$: $\rho = y$, the line is \textbf{horizontal} ($y=\rho$).
+Always compute; never match numbers by eye.
+\end{hook}
+
+\sub{How many votes does a point with a gradient cast?}
+
+\begin{question}
+$\theta\in\{0^\circ,\dots,359^\circ\}$, $\rho\in\{-100,\dots,100\}$. Given a
+point $(x,y)$ \emph{and its gradient} $(G_x,G_y)$: how many $(\theta,\rho)$
+candidates, i.e.\ how many votes?
+\end{question}
+\begin{yours}
+360 (one vote per $\theta$).
+\end{yours}
+\begin{correct}
+1.
+\end{correct}
+
+\fig{%
+\begin{minipage}{0.42\linewidth}\centering
+\begin{tikzpicture}[scale=0.8]
+  \draw[-{Latex[length=1.6mm]}, black!50] (-0.3,0) -- (4.3,0) node[right, font=\scriptsize] {$x$};
+  \draw[-{Latex[length=1.6mm]}, black!50] (0,-0.3) -- (0,4.3) node[above, font=\scriptsize] {$y$};
+  \draw[thick, rightc] (0.68,4.23) -- (4.12,1.17);
+  \fill[accent] (2.4,2.7) circle (2.5pt);
+  \draw[-{Latex[length=2.2mm]}, very thick, hookc] (2.4,2.7) -- (3.2,3.6)
+    node[right, font=\scriptsize] {$(G_x,G_y)$};
+  \draw[dashed, black!40] (0,0) -- (2.4,2.7);
+  \draw[black!60] (0.7,0) arc (0:48.4:0.7);
+  \node[font=\scriptsize] at (0.95,0.4) {$\theta$};
+  \node[font=\scriptsize, text=rightc, anchor=west] at (4.2,1.15) {the only line};
+\end{tikzpicture}\par\small image space
+\end{minipage}\hfill
+\begin{minipage}{0.55\linewidth}\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth, height=5cm, xmin=0, xmax=360, ymin=-4.5, ymax=4.5,
+    domain=0:360, samples=120, xlabel={$\theta$ [deg]}, ylabel={$\rho$},
+    xtick={0,90,180,270,360}, axis lines=left,
+    tick label style={font=\scriptsize}, label style={font=\small}]
+  \addplot[thick, accent!60] {2.4*cos(x)/1.2+2.7*sin(x)/1.2};
+  \addplot[only marks, mark=*, mark size=3pt, hookc] coordinates {(48.4,3.01)};
+  \node[font=\scriptsize\sffamily, text=accent, anchor=north] at (axis cs:250,-3.1)
+    {without gradient: 360 votes};
+  \node[font=\scriptsize\sffamily, text=hookc, anchor=west] at (axis cs:58,3.4)
+    {with gradient: 1 vote};
+\end{axis}
+\end{tikzpicture}\par\small Hough space
+\end{minipage}}{Without a gradient the point is consistent with every line
+through it: one vote per $\theta$ bin, a whole sinusoid. The gradient is the
+line's normal, so it fixes $\theta$; then $\rho = x\cos\theta+y\sin\theta$ is
+fixed too, and exactly one cell receives the vote.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Point only: $\theta$ free, $\rho$ follows $\Rightarrow$ one vote per
+        $\theta$ bin (here 360).
+  \item Point \emph{and} gradient: $\theta=\operatorname{atan2}(G_y,G_x)$ fixed
+        $\Rightarrow$ $\rho$ fixed $\Rightarrow$ \textbf{1} vote.
+  \item The number of $\rho$ bins (201) never counts: $\rho$ is always computed,
+        never searched.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+Count the \textbf{free parameters} after using all given information. Each free
+parameter multiplies the votes by its number of bins; zero free parameters means
+one vote.
+\end{hook}
+
+\sub{Transforming an R-table}
+
+This task was solved correctly, but it has several traps. The procedure below
+keeps it reproducible for other scales, angles, and table ranges.
+
+\begin{question}
+Transform the R-table with scale $s=2$ and a counter-clockwise rotation of
+$\varphi=180^\circ$. Rows: $[0,45)$: $(1,2);(3,4)$ \quad $[45,90)$: -- \quad
+$[90,135)$: $(5,6);(7,8)$ \quad $[135,180)$: $(9,10)$.
+\end{question}
+
+\fig{%
+\begin{minipage}{0.48\linewidth}\centering
+\begin{tikzpicture}[scale=0.62,
+    vec/.style={-{Latex[length=2.2mm]}, very thick}]
+  \draw[black!15] (-4.5,-4.5) grid (4.5,4.5);
+  \draw[-{Latex[length=1.6mm]}, black!50] (-4.7,0) -- (4.8,0) node[right, font=\scriptsize] {$x$};
+  \draw[-{Latex[length=1.6mm]}, black!50] (0,-4.7) -- (0,4.8) node[above, font=\scriptsize] {$y$};
+  \draw[vec, accent] (0,0) -- (1,2) node[above right, font=\scriptsize] {$(1,2)$};
+  \draw[vec, rightc] (0,0) -- (-2,-4);
+  \draw[vec, hookc] (0,0) -- (-1,-2);
+  \node[font=\scriptsize, text=hookc, anchor=west, fill=white, inner sep=1pt] at (-0.7,-2.1) {1.~rotate: $(-1,-2)$};
+  \node[font=\scriptsize, text=rightc, anchor=west, fill=white, inner sep=1pt] at (-1.7,-4.1) {2.~scale: $(-2,-4)$};
+  \draw[hookc, -{Latex[length=1.6mm]}] (0.9,0.5) arc (27:207:1) ;
+  \node[font=\scriptsize, text=hookc, fill=white, inner sep=1pt] at (-1.5,1.3) {$180^\circ$};
+\end{tikzpicture}\par\small displacement vectors
+\end{minipage}\hfill
+\begin{minipage}{0.48\linewidth}\centering
+\begin{tikzpicture}[scale=0.62]
+  \draw[black!40] (0,0) circle (3);
+  \foreach \a in {0,45,90,135} {
+    \draw[black!25] (0,0) -- (\a:3.3);
+    \draw[black!25] (0,0) -- (\a+180:3.3);
+  }
+  \foreach \a/\l in {22.5/{[0,45)}, 67.5/{[45,90)}, 112.5/{[90,135)}, 157.5/{[135,180)}} {
+    \node[font=\scriptsize, text=accent] at (\a:3.9) {\l};
+    \node[font=\scriptsize, text=accent] at (\a+180:3.9) {\l};
+  }
+  \draw[-{Latex[length=2.2mm]}, very thick, accent] (0,0) -- (20:2.6) node[pos=0.55, above, font=\scriptsize] {$\theta$};
+  \draw[-{Latex[length=2.2mm]}, very thick, rightc] (0,0) -- (200:2.6) node[pos=0.75, below=2pt, font=\scriptsize, fill=white, inner sep=1pt] {$\theta+180^\circ$};
+\end{tikzpicture}\par\small gradient orientation modulo $180^\circ$
+\end{minipage}}{Left: rotating by $180^\circ$ negates each displacement, scaling
+by $2$ doubles it. Right: a gradient direction rotated by $180^\circ$ lies on the
+same line, so with a table over $[0^\circ,180^\circ)$ it stays in its row.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Scale}: multiply every displacement by $s$. Rows stay, since
+        scaling does not change gradient directions.
+  \item \textbf{Rotate the vectors} by $\varphi$. For $180^\circ$:
+        $(d_x,d_y)\mapsto(-d_x,-d_y)$.
+  \item \textbf{Rotate the rows}: every entry moves to the row for $\theta+\varphi$.
+        Check the table range! Over $[0^\circ,180^\circ)$, orientations are taken
+        modulo $180^\circ$, so $\theta+180^\circ\equiv\theta$: nothing moves.
+  \item Result: $(1,2)\to(-2,-4)$, $(3,4)\to(-6,-8)$, $(5,6)\to(-10,-12)$,
+        $(7,8)\to(-14,-16)$, $(9,10)\to(-18,-20)$; rows unchanged.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+Typical distractors: only shifted rows, swapped components ($=$ reflection), or
+an unchanged table. If the table covers $[0^\circ,360^\circ)$, a $180^\circ$ rotation
+\emph{does} move rows. Translation never changes an R-table.
+\end{hook}
+
+\sub{Gradient correlation and the correlation theorem}
+
+\begin{question}
+Instead of R-tables, correlate the complex gradient images
+$I' = \partial_x I + i\,\partial_y I$ and $O' = \partial_x O + i\,\partial_y O$.
+Which statements are true about $\operatorname{Re}/\operatorname{Im}(I'\star O')$
+and about computing $I'\star O'$ with the DFT?
+\end{question}
+\begin{yours}
+The real part was chosen correctly, but also
+$I'\star O' = \mathrm{DFT}^{-1}\bigl(\mathrm{DFT}(I)\cdot\mathrm{DFT}(O)\bigr)$,
+which has no conjugate and therefore computes a convolution.
+\end{yours}
+\begin{correct}
+$\operatorname{Re}(I'\star O')$ sums the gradient dot products (almost Hough
+voting), and
+$I'\star O' = \mathrm{DFT}^{-1}\bigl(\mathrm{DFT}(I)\cdot\mathrm{DFT}(O)^*\bigr)$.
+\end{correct}
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+  \toprule
+  Frequency-domain product & Signal-domain result \\
+  \midrule
+  $\mathrm{DFT}(f)\cdot\mathrm{DFT}(g)$ & convolution $f*g$ \\
+  $\mathrm{DFT}(f)\cdot\mathrm{DFT}(g)^*$ or $\mathrm{DFT}(f)^*\cdot\mathrm{DFT}(g)$ & correlation (the two only mirror the shift) \\
+  $\mathrm{DFT}(f)^*\cdot\mathrm{DFT}(g)^*$ & neither \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{why}
+Correlation slides the template \emph{without flipping} it; convolution flips it.
+In the frequency domain, flipping a real signal is complex conjugation. The
+conjugate undoes the flip that convolution would apply, so exactly one conjugate
+turns a convolution into a correlation. For the real part: with
+$a=a_x+ia_y$, $b=b_x+ib_y$, $\operatorname{Re}(a^*b)=a_xb_x+a_yb_y$, the dot
+product of the two gradient vectors. The imaginary part is a cross product.
+\end{why}
+
+\begin{hook}
+\textbf{Conv} $=$ plain product. \textbf{Corr} $=$ product with \textbf{one star}.
+\end{hook}
+
+% =================================================================
+\clearpage
+\topic{Bayesian Decision Theory}{}\label{sec:bayes}
+
+Every task in this chapter is a sum or a ranking. Posteriors and risks are sums
+over \emph{all} hypotheses or states; discriminant functions only need to rank
+the classes like the posterior; the expected error integrates $x$ away. The
+mistakes came from dropping terms from a sum and from overlooking standard
+facts about Gaussian classes.
+
+\sub{Computing a posterior}
+
+\begin{question}
+$P(D\mid\Omega_1)=0.52$, $P(D\mid\Omega_2)=0.58$, $P(\Omega_1)=0.53$,
+$P(\Omega_2)=0.47$. Find $P(\Omega_1\mid D)$ to four decimals.
+\end{question}
+\begin{correct}
+$0.5027$
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}[x=20cm]
+  \fill[accent!70] (0,0) rectangle (0.2756,1);
+  \fill[hookc!70] (0.2756,0) rectangle (0.5482,1);
+  \node[text=white, font=\sffamily\small, align=center] at (0.1378,0.5)
+    {$\Omega_1$: $0.52\cdot0.53 = 0.2756$};
+  \node[text=white, font=\sffamily\small, align=center] at (0.4119,0.5)
+    {$\Omega_2$: $0.58\cdot0.47 = 0.2726$};
+  \draw[decorate, decoration={brace, amplitude=6pt, mirror}, thick]
+    (0,-0.15) -- node[below=7pt, font=\sffamily\small]
+    {evidence $P(D) = 0.5482$} (0.5482,-0.15);
+  \draw[decorate, decoration={brace, amplitude=6pt}, thick, accent]
+    (0,1.15) -- node[above=7pt, font=\sffamily\small, text=accent]
+    {$P(\Omega_1\mid D) = 0.2756/0.5482 = 0.5027$} (0.2756,1.15);
+\end{tikzpicture}}{Each bar is likelihood $\times$ prior. The posterior is one
+bar's share of the total. $\Omega_2$ has the higher likelihood, but its lower prior
+makes $\Omega_1$ slightly more probable.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Numerator per hypothesis: likelihood $\times$ prior.
+  \item Evidence: sum of \emph{all} numerators.
+  \item Posterior: own numerator $/$ evidence. Check that all posteriors sum to 1
+        ($0.5027 + 0.4973$).
+  \item Keep four or more decimals in between; round only at the end.
+\end{enumerate}
+\end{steps}
+
+\sub{Expected risk of an action}
+
+\begin{question}
+Loss $\lambda(\alpha_i\mid\omega_j)$: treat ($\alpha_1$) costs 18 if ill
+($\omega_1$) and 27 if healthy ($\omega_2$). $P(\omega_1\mid x)=0.75$. Expected risk
+of treating?
+\end{question}
+\begin{yours}
+$6.75 = 27\cdot0.25$: only the ``healthy'' term.
+\end{yours}
+\begin{correct}
+$R(\alpha_1\mid x) = 18\cdot0.75+27\cdot0.25 = 13.50+6.75 = 20.25$
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}[x=0.5cm]
+  \fill[accent!70] (0,0) rectangle (13.5,1);
+  \fill[hookc!70] (13.5,0) rectangle (20.25,1);
+  \node[text=white, font=\sffamily\small] at (6.75,0.5) {$18\cdot0.75=13.50$ (ill)};
+  \node[text=white, font=\sffamily\small] at (16.9,0.5) {$27\cdot0.25=6.75$};
+  \draw[decorate, decoration={brace, amplitude=6pt, mirror}, thick]
+    (0,-0.15) -- node[below=7pt, font=\sffamily\small] {$R(\alpha_1\mid x)=20.25$} (20.25,-0.15);
+  \draw[decorate, decoration={brace, amplitude=5pt}, thick, wrongc]
+    (13.5,1.15) -- node[above=6pt, font=\sffamily\small, text=wrongc] {wrong answer} (20.25,1.15);
+\end{tikzpicture}}{The risk of one action is a sum over \emph{all} true states.
+The answer 6.75 is only the healthy-patient part.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Fix the action: $\alpha_1$ (treat) $=$ one column of the loss table.
+  \item Write one term per true state: $R(\alpha_1\mid x)=\lambda(\alpha_1\mid\omega_1)P(\omega_1\mid x)+\lambda(\alpha_1\mid\omega_2)P(\omega_2\mid x)$.
+  \item Complete the posteriors: $P(\omega_2\mid x)=1-0.75=0.25$.
+  \item Insert: $18\cdot0.75+27\cdot0.25=20.25$.
+  \item \textbf{Sanity check:} the risk is a weighted average of the column
+        entries, so it lies between 18 and 27.
+  \item If asked for the decision: $R(\alpha_2\mid x)=57\cdot0.75+0\cdot0.25=42.75$
+        $>20.25$ $\Rightarrow$ treat.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+Risk $=$ \textbf{weighted average} of one action's losses. It can never be
+smaller than the smallest loss in that column.
+\end{hook}
+
+\sub{Valid discriminant functions}
+
+\begin{question}
+Which of the following are valid discriminant functions $g_i(x)$ for the MAP
+rule? Candidates included $P(\omega_i)$, $\sqrt{p(x\mid\omega_i)P(\omega_i)}$,
+and $P(\omega_i\mid x)$.
+\end{question}
+\begin{yours}
+$P(\omega_i)$ and $\sqrt{p(x\mid\omega_i)P(\omega_i)}$: the prior alone was
+accepted, and the posterior itself was missed.
+\end{yours}
+\begin{correct}
+$\sqrt{p(x\mid\omega_i)P(\omega_i)}$ and $P(\omega_i\mid x)$.
+\end{correct}
+
+\begin{why}
+$g_i(x)$ is a valid discriminant function if it \textbf{ranks the classes like
+the posterior} $P(\omega_i\mid x)$ for \textbf{every} $x$. The posterior itself
+qualifies trivially, and so does any strictly increasing transform applied equally
+to all classes. $P(\omega_i)$ ignores $x$: it picks the same class for every input.
+\end{why}
+
+\fig{%
+\begin{tikzpicture}
+\pgfplotsset{small panel/.style={
+    width=0.37\linewidth, height=4.3cm, domain=-3:5, samples=100,
+    xlabel={$x$}, axis lines=left, xtick=\empty, ytick=\empty,
+    label style={font=\small}, title style={font=\sffamily\small}}}
+\begin{axis}[small panel, title={$p(x\mid\omega_i)P(\omega_i)$}, ymin=0, ymax=0.3]
+  \addplot[thick, accent] {0.7*exp(-x^2/2)/sqrt(2*pi)};
+  \addplot[thick, hookc] {0.3*exp(-(x-2)^2/2)/sqrt(2*pi)};
+  \draw[dashed, black!50] (axis cs:1.424,0) -- (axis cs:1.424,0.3);
+\end{axis}
+\begin{axis}[small panel, xshift=0.34\linewidth, title={$\sqrt{p(x\mid\omega_i)P(\omega_i)}$}, ymin=0, ymax=0.55]
+  \addplot[thick, accent] {sqrt(0.7*exp(-x^2/2)/sqrt(2*pi))};
+  \addplot[thick, hookc] {sqrt(0.3*exp(-(x-2)^2/2)/sqrt(2*pi))};
+  \draw[dashed, black!50] (axis cs:1.424,0) -- (axis cs:1.424,0.55);
+\end{axis}
+\begin{axis}[small panel, xshift=0.68\linewidth, title={$P(\omega_i)$ alone}, ymin=0, ymax=0.85]
+  \addplot[thick, accent] {0.7};
+  \addplot[thick, hookc] {0.3};
+  \node[font=\sffamily\scriptsize, text=wrongc] at (axis cs:1,0.5) {no boundary};
+\end{axis}
+\end{tikzpicture}}{Two classes with priors $0.7$ and $0.3$. The square root
+changes the curves but not where they cross, so the decision boundary (dashed) is
+the same. The priors alone never cross: every $x$ goes to class 1.}
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+  \toprule
+  Candidate $g_i(x)$ & Valid? \\
+  \midrule
+  $P(\omega_i\mid x)$ & \ok{} always (the reference) \\
+  $p(x\mid\omega_i)P(\omega_i)$ & \ok{} always (posterior $\times$ $p(x)$, same for all classes) \\
+  $\sqrt{\cdot}$, $\ln(\cdot)$ of the above & \ok{} always (strictly increasing) \\
+  $p(x\mid\omega_i)$ & \bad{} only if all priors are equal \\
+  $P(\omega_i)$ & \bad{} only if all likelihoods are identical \\
+  $1/g_i$, $-g_i$ & \bad{} never (ranking reversed) \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{hook}
+Quick test: does it use \textbf{likelihood and prior together} (or the posterior
+directly), combined by an increasing function? Then it is valid.
+\end{hook}
+
+\sub{Gaussian classes: shape of the decision boundary}
+
+\begin{question}
+Which statements about Gaussian class-conditional densities are true? (The four
+statements are listed in the table.)
+\end{question}
+\begin{yours}
+Only the last statement was ticked; the two standard facts about linear and
+quadric boundaries were missed.
+\end{yours}
+
+\begin{why}
+The key is one picture: \textbf{the logarithm of a Gaussian is a downward
+parabola}, $\ln p(x\mid\omega_i) = -\frac{(x-\mu_i)^2}{2\sigma_i^2} + \text{const}_i$.
+The width $\sigma_i$ sets how sharply the parabola bends. The decision boundary
+is where two such parabolas (plus $\ln P(\omega_i)$) are equal, i.e.\ where their
+\emph{difference} is zero. Two parabolas with the \textbf{same bend} differ by a
+straight line: the $x^2$ terms cancel, one crossing. Two parabolas with
+\textbf{different bends} differ by another parabola: the $x^2$ term survives, up
+to two crossings.
+\end{why}
+
+\fig{%
+\begin{tikzpicture}
+\pgfplotsset{logpanel/.style={
+    width=0.5\linewidth, height=5cm, domain=-3:3.5, samples=120,
+    xlabel={$x$}, ylabel={$\ln p(x\mid\omega_i)$}, axis lines=left,
+    xtick=\empty, ytick=\empty, ymin=-6, ymax=1.8,
+    label style={font=\small}, title style={font=\sffamily\small}}}
+\begin{axis}[logpanel, title={same $\sigma$: one crossing}]
+  \addplot[very thick, accent] {-(x+1)^2/2};
+  \addplot[very thick, hookc] {-(x-1.5)^2/2};
+  \draw[dashed, black!60] (axis cs:0.25,-6) -- (axis cs:0.25,1.8);
+  \node[font=\sffamily\scriptsize, text=accent, anchor=south] at (axis cs:-1,0.05) {$\omega_1$};
+  \node[font=\sffamily\scriptsize, text=hookc, anchor=south] at (axis cs:1.5,0.05) {$\omega_2$};
+\end{axis}
+\begin{axis}[logpanel, xshift=0.5\linewidth, title={different $\sigma$: two crossings}]
+  \addplot[very thick, accent] {-x^2/(2*0.36)-ln(0.6)};
+  \addplot[very thick, hookc] {-(x-0.5)^2/(2*2.25)-ln(1.5)};
+  \draw[dashed, black!60] (axis cs:-1.013,-6) -- (axis cs:-1.013,1.8);
+  \draw[dashed, black!60] (axis cs:0.822,-6) -- (axis cs:0.822,1.8);
+  \node[font=\sffamily\scriptsize, text=accent, anchor=south] at (axis cs:-0.1,0.65) {narrow $\omega_1$};
+  \node[font=\sffamily\scriptsize, text=hookc, anchor=north] at (axis cs:2.4,-2.2) {wide $\omega_2$};
+  \node[font=\sffamily\scriptsize, anchor=south] at (axis cs:-2.4,-4.6) {$\omega_2$};
+  \node[font=\sffamily\scriptsize, anchor=south] at (axis cs:-0.1,-5.9) {$\omega_1$};
+  \node[font=\sffamily\scriptsize, anchor=south] at (axis cs:2.5,-4.6) {$\omega_2$};
+\end{axis}
+\end{tikzpicture}}{Log-densities in 1D. Left: equal widths, so the parabolas
+are shifted copies and cross once: a single threshold (the 1D ``line''). Right:
+a narrow and a wide class. The narrow parabola is higher near its center but
+falls faster, so the wide class wins again on \emph{both} sides: two thresholds,
+the 1D version of a closed quadric.}
+
+\fig{%
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=0.9cm, y=0.9cm,
+    c1/.style={accent, thick}, c2/.style={hookc, thick},
+    bd/.style={black, very thick}, ttl/.style={font=\sffamily\small, anchor=north}]
+  % ---- panel 1: shared covariance -> line
+  \begin{scope}
+    \clip (-2.6,-2.3) rectangle (2.6,2.3);
+    \foreach \s in {0.55,1} {
+      \draw[c1, rotate around={30:(-1,-0.5)}] (-1,-0.5) ellipse ({1.1*\s} and {0.55*\s});
+      \draw[c2, rotate around={30:(1,0.5)}] (1,0.5) ellipse ({1.1*\s} and {0.55*\s});}
+    \fill[accent] (-1,-0.5) circle (2pt);
+    \fill[hookc] (1,0.5) circle (2pt);
+    \draw[bd] (0.63,-2.12) -- (-0.63,2.12);
+  \end{scope}
+  \draw[black!30] (-2.6,-2.3) rectangle (2.6,2.3);
+  \node[ttl] at (0,-2.4) {shared $\Sigma$: straight line};
+  % ---- panel 2: nested -> circle / ellipse
+  \begin{scope}[xshift=6cm]
+    \clip (-2.6,-2.3) rectangle (2.6,2.3);
+    \foreach \s in {0.5,1} {
+      \draw[c1] (0,0) circle ({0.5*\s});
+      \draw[c2] (0,0) circle ({1.5*\s});}
+    \fill[accent] (0,0) circle (2pt);
+    \draw[bd] (0,0) circle (1.11);
+    \node[font=\sffamily\scriptsize, text=hookc] at (0,-1.95) {$\omega_2$ wins outside};
+  \end{scope}
+  \draw[black!30] (3.4,-2.3) rectangle (8.6,2.3);
+  \node[ttl] at (6,-2.4) {narrow inside wide: ellipse};
+  % ---- panel 3: crossed orientation -> hyperbola
+  \begin{scope}[xshift=12cm]
+    \clip (-2.6,-2.3) rectangle (2.6,2.3);
+    \foreach \s in {0.55,1} {
+      \draw[c1] (0,0) ellipse ({1*\s} and {2*\s});
+      \draw[c2] (0,0) ellipse ({2*\s} and {0.707*\s});}
+    \draw[bd, domain=-2.6:2.6, samples=60] plot (\x,{sqrt((0.693+0.75*\x*\x)/1.75)});
+    \draw[bd, domain=-2.6:2.6, samples=60] plot (\x,{-sqrt((0.693+0.75*\x*\x)/1.75)});
+    \node[font=\sffamily\scriptsize, text=accent, fill=white, inner sep=1pt] at (0.6,1.65) {$\omega_1$};
+    \node[font=\sffamily\scriptsize, text=hookc, fill=white, inner sep=1pt] at (1.9,-0.5) {$\omega_2$};
+  \end{scope}
+  \draw[black!30] (9.4,-2.3) rectangle (14.6,2.3);
+  \node[ttl] at (12,-2.4) {crossed orientations: hyperbola};
+\end{tikzpicture}}}{Two classes in 2D, drawn as density contours (blue
+$\omega_1$, orange $\omega_2$), with the Bayes boundary in black for equal priors.
+Left: same shape and orientation, only the centers differ; the boundary is a
+line, tilted by $\Sigma^{-1}$ (not simply perpendicular to the line between the
+means). Middle: same center, different spread; the narrow class wins only inside a
+closed curve. Right: one class elongated vertically, the other horizontally; each
+wins along its own long axis, and the boundary is a hyperbola.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Take the log discriminant:
+        $g_i(x) = -\tfrac12(x-\mu_i)^\top\Sigma_i^{-1}(x-\mu_i) - \tfrac12\ln|\Sigma_i| + \ln P(\omega_i)$.
+  \item Expand the quadratic form:
+        $g_i(x) = \underbrace{-\tfrac12 x^\top\Sigma_i^{-1}x}_{\text{quadratic}}
+        + \underbrace{\mu_i^\top\Sigma_i^{-1}x}_{\text{linear}} + \text{const}_i$.
+  \item Boundary: $g_1(x)-g_2(x)=0$. The quadratic part of the difference is
+        $-\tfrac12 x^\top(\Sigma_1^{-1}-\Sigma_2^{-1})x$.
+  \item $\Sigma_1=\Sigma_2$ $\Rightarrow$ it vanishes $\Rightarrow$ the boundary is
+        $w^\top x + w_0 = 0$: a \textbf{hyperplane} (line in 2D, point in 1D).
+  \item $\Sigma_1\ne\Sigma_2$ $\Rightarrow$ it stays $\Rightarrow$ the boundary is a
+        \textbf{hyperquadric}. Which one depends on the sign pattern of
+        $\Sigma_1^{-1}-\Sigma_2^{-1}$: all same sign (one class narrower in every
+        direction) $\to$ ellipse; mixed signs (each class wider in some
+        direction) $\to$ hyperbola; zero in one direction $\to$ parabola.
+  \item Priors only change the constant $w_0$: they \emph{shift} the boundary
+        toward the less probable class, never change its shape.
+\end{enumerate}
+\end{steps}
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{5.2cm}c X@{}}
+  \toprule
+  Statement & True? & Reason \\
+  \midrule
+  same $\Sigma$ for all classes $\Rightarrow$ linear boundary & \ok &
+    $x^\top\Sigma^{-1}x$ is the same for every class and cancels \\
+  arbitrary $\Sigma_i$ $\Rightarrow$ hyperquadric & \ok & quadratic term
+    stays; ellipse, parabola, hyperbola \\
+  same $\mu$, different $\Sigma_i$ $\Rightarrow$ $g_i=P(\omega_i)$ valid & \bad &
+    likelihoods still differ with $x$ (narrow vs.\ wide class) \\
+  same $\mu$ \emph{and} $\Sigma$, $P(\omega_2)>P(\omega_1)$ $\Rightarrow$
+    $g_1=1$, $g_2=2$ valid & \ok & identical likelihoods: prior decides, class 2
+    always wins, and $2>1$ ranks it first \\
+  \bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{hook}
+\textbf{Shared} covariance $\to$ \textbf{straight} line. \textbf{Own} covariance
+$\to$ \textbf{curve}. Only \textbf{identical} likelihoods let the prior decide
+alone.
+\end{hook}
+
+\sub{Expected classification error}
+
+\begin{question}
+Binary MAP classification. Which expressions give the expected classification
+error, in general and if $P(\omega_1\mid x)>P(\omega_2\mid x)$ for all $x$?
+\end{question}
+\begin{yours}
+The general $\min$-integral was correct, but for the special case
+$P(\omega_2\mid x)$ was chosen, which still depends on $x$.
+\end{yours}
+\begin{correct}
+$P(\text{error})=\int\min[P(\omega_1\mid x),P(\omega_2\mid x)]\,p(x)\,dx$,
+and in the special case $P(\text{error})=P(\omega_2)$.
+\end{correct}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item If $P(\omega_1\mid x)>P(\omega_2\mid x)$ for every $x$, the classifier
+        always says $\omega_1$.
+  \item It is wrong exactly when the truth is $\omega_2$. Error at $x$:
+        $P(\omega_2\mid x)$.
+  \item \emph{Expected} error averages over all $x$:
+        $\int P(\omega_2\mid x)\,p(x)\,dx = P(\omega_2)$ (marginalization).
+  \item $P(\omega_2\mid x)$ alone is the error at \emph{one} $x$; an expected value
+        cannot still contain $x$.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+``Expected'' means the $x$ is integrated out. If $x$ is still in the answer, it is
+not an expectation.
+\end{hook}
+
+% =================================================================
+\clearpage
+\topic{Parameter Estimation}{}\label{sec:mle}
+
+Maximum likelihood always follows the same four steps, and the result must be
+the \emph{parameter}, not a statistic of the data. Judging estimators needs one
+formula: mean squared error equals squared bias plus variance.
+
+\sub{Maximum likelihood: always the same recipe}
+
+The first task (Poisson) was left blank; the second (geometric) returned the
+sample mean instead of the parameter. Both follow the same four steps.
+
+\begin{question}
+Error counts $X=\{2,8,4,2,6\}$, model $P(k)=\lambda^k e^{-\lambda}/k!$.
+Find $\lambda_\text{MLE}$.
+\end{question}
+\begin{correct}
+$\lambda_\text{MLE} = \bar{k} = 22/5 = 4.40$
+\end{correct}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Likelihood (product over samples):
+        $L(\lambda) = \prod_i \lambda^{k_i}e^{-\lambda}/k_i!$
+  \item Log-likelihood: $\ell(\lambda) = \big(\sum_i k_i\big)\ln\lambda - n\lambda
+        - \sum_i\ln k_i!$
+  \item Derivative $=0$: $\frac{\sum_i k_i}{\lambda} - n = 0$
+        $\;\Rightarrow\; \lambda_\text{MLE} = \frac1n\sum_i k_i$
+  \item Insert: $(2+8+4+2+6)/5 = 22/5 = 4.40$
+\end{enumerate}
+\end{steps}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.66\linewidth, height=5cm, domain=1:10, samples=100,
+    xlabel={$\lambda$}, ylabel={$\ell(\lambda)$ (up to a constant)},
+    axis lines=left, ymin=0, ymax=12.5,
+    tick label style={font=\scriptsize}, label style={font=\small}]
+  \addplot[thick, accent] {22*ln(x)-5*x};
+  \draw[dashed, hookc] (axis cs:4.4,0) -- (axis cs:4.4,10.6);
+  \addplot[only marks, mark=*, mark size=2.5pt, hookc] coordinates {(4.4,10.595)};
+  \node[font=\sffamily\small, text=hookc, anchor=south] at (axis cs:4.4,10.8)
+    {$\lambda_\text{MLE}=4.4$};
+\end{axis}
+\end{tikzpicture}}{The log-likelihood $22\ln\lambda - 5\lambda$ peaks at the
+sample mean.}
+
+\begin{question}
+Days until the first failure $D=\{8,6,10,9,4\}$, model
+$P(k)=(1-p)^{k-1}p$. Find $p_\text{MLE}$.
+\end{question}
+\begin{yours}
+7.4: the sample mean, not the parameter.
+\end{yours}
+\begin{correct}
+$p_\text{MLE} = 5/37 \approx 0.14$
+\end{correct}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Likelihood: $L(p)=\prod_i (1-p)^{k_i-1}p$.
+  \item Log-likelihood: $\ell(p)=\sum_i(k_i-1)\ln(1-p)+n\ln p$, with
+        $\sum_i(k_i-1)=37-5=32$, $n=5$.
+  \item Derivative $=0$: $-\dfrac{32}{1-p}+\dfrac{5}{p}=0
+        \;\Rightarrow\; 5(1-p)=32p \;\Rightarrow\; p=\dfrac{5}{37}$.
+  \item General form: $p_\text{MLE}=\dfrac{n}{\sum_i k_i}=\dfrac{1}{\bar k}$.
+        Insert: $1/7.4 = 0.135 \to 0.14$.
+  \item \textbf{Sanity check:} $p$ is a probability. Any answer outside $[0,1]$ is
+        wrong.
+\end{enumerate}
+\end{steps}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.62\linewidth, height=4.8cm, domain=0.03:0.45, samples=120,
+    xlabel={$p$}, ylabel={$\ell(p)$}, axis lines=left, ymin=-24, ymax=-13,
+    tick label style={font=\scriptsize}, label style={font=\small}]
+  \addplot[thick, accent] {32*ln(1-x)+5*ln(x)};
+  \draw[dashed, hookc] (axis cs:0.135,-24) -- (axis cs:0.135,-14.9);
+  \addplot[only marks, mark=*, mark size=2.5pt, hookc] coordinates {(0.1351,-14.9)};
+  \node[font=\sffamily\small, text=hookc, anchor=west] at (axis cs:0.16,-14.4)
+    {$p_\text{MLE}=5/37$};
+\end{axis}
+\end{tikzpicture}}{The log-likelihood of the five waiting times peaks at one
+over the mean waiting time.}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  Model & Parameter & MLE \\
+  \midrule
+  Poisson $\lambda^k e^{-\lambda}/k!$ & rate & $\bar k$ \\
+  Bernoulli & success probability & fraction of ones \\
+  Gaussian & $\mu$ & $\bar x$ \\
+  Gaussian & $\sigma^2$ & $\frac1n\sum_i(x_i-\hat\mu)^2$ (divide by $n$) \\
+  Geometric $(1-p)^{k-1}p$ & per-trial probability & $1/\bar k$ \\
+  Exponential $\lambda e^{-\lambda t}$ & rate & $1/\bar t$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{hook}
+\textbf{Counts} $\to$ mean. \textbf{Waiting times} $\to$ one over the mean.
+\end{hook}
+
+\sub{Bias, variance, and MSE of estimators}
+
+\begin{question}
+$X_i\sim\mathcal N(\mu,\sigma^2)$. Estimators $\hat\mu_A=0$,
+$\hat\mu_B=\frac1N\sum_iX_i$, $\hat\mu_C=X_1$. Which has the highest / lowest
+variance, and does $\hat\mu_B$ always have the lowest MSE?
+\end{question}
+\begin{yours}
+``$\hat\mu_B$ \emph{always} has the lowest MSE'' was ticked. The two variance
+statements were correct.
+\end{yours}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.75\linewidth, height=5cm, domain=-1:5, samples=150,
+    xlabel={value of the estimate}, ylabel={density}, axis lines=left,
+    ymin=0, ymax=1.6, xtick={0,2}, xticklabels={$0$,$\mu$}, ytick=\empty,
+    tick label style={font=\small}, label style={font=\small},
+    legend style={font=\sffamily\small, draw=none, at={(1.02,0.5)}, anchor=west},
+    legend cell align=left]
+  \addplot[very thick, wrongc] coordinates {(0,0) (0,1.5)};
+  \addplot[very thick, rightc] {exp(-(x-2)^2/(2*0.3^2))/(0.3*sqrt(2*pi))};
+  \addplot[very thick, whyc] {exp(-(x-2)^2/(2*1^2))/(1*sqrt(2*pi))};
+  \legend{$\hat\mu_A=0$, $\hat\mu_B$ (mean), $\hat\mu_C=X_1$}
+\end{axis}
+\end{tikzpicture}}{Where each estimate lands over many datasets. A is a spike
+(no variance) at the wrong place (bias $-\mu$). B and C are centered on $\mu$, but
+C scatters $N$ times more (variance $\sigma^2$ vs.\ $\sigma^2/N$).}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Use $\mathrm{MSE}=\text{bias}^2+\text{variance}$.
+  \item Fill the table:
+\end{enumerate}
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+  \toprule
+  Estimator & Bias & Variance & MSE \\
+  \midrule
+  $\hat\mu_A=0$ & $-\mu$ & $0$ (lowest) & $\mu^2$ \\
+  $\hat\mu_B$ & $0$ & $\sigma^2/N$ & $\sigma^2/N$ \\
+  $\hat\mu_C=X_1$ & $0$ & $\sigma^2$ (highest) & $\sigma^2$ \\
+  \bottomrule
+\end{tabular}
+\begin{enumerate}[leftmargin=*, start=3]
+  \item Test ``always'': if $\mu^2<\sigma^2/N$ (true mean near $0$), the constant
+        $\hat\mu_A$ has the lower MSE. One counterexample $\Rightarrow$ false.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+A constant has \textbf{zero variance} but can have huge bias. Lowest MSE depends
+on the unknown $\mu$, so ``always'' fails.
+\end{hook}
+
+% =================================================================
+\clearpage
+\topic{Training Neural Networks}{}\label{sec:nn}
+
+This chapter follows one training step: what backpropagation stores and passes
+on, how the loss shapes the gradient, why SGD is used, and how to read and fix
+underfitting and overfitting. Most mistakes here were single wrong ticks among
+otherwise correct answers, so the tables list a verdict and a one-line reason
+for every statement.
+
+\sub{Memory consumption of backpropagation}
+
+\begin{yours}
+``Memory is proportional to the number of trainable parameters.''
+\end{yours}
+\begin{correct}
+``Memory is proportional to the combined output dimensionalities of the nodes in
+the network.''
+\end{correct}
+
+\begin{why}
+The backward pass needs, at every node, the value that node produced in the
+forward pass: the input $x$ for the derivative of $w\cdot x$, the ReLU input to
+know whether it was active. All these \textbf{activations} are stored until the
+backward pass. Their number is the sum of the output sizes of all nodes (times the
+batch size). Convolutional layers have few parameters but huge outputs, so
+parameter count and memory are not proportional.
+\end{why}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    ybar, bar width=1.4cm, width=0.62\linewidth, height=5.2cm,
+    ymode=log, ymin=100, ymax=3e7, log origin=infty,
+    symbolic x coords={Parameters, Stored activations},
+    xtick=data, enlarge x limits=0.5,
+    ylabel={count (log scale)},
+    tick label style={font=\sffamily\small},
+    label style={font=\sffamily\small},
+    nodes near coords, every node near coord/.append style={font=\sffamily\small},
+    point meta=explicit symbolic, axis lines*=left, ymajorgrids,
+    grid style={black!10}]
+  \addplot[fill=whyc!60, draw=whyc] coordinates
+    {(Parameters,1792) [1\,792] (Stored activations,3211264) [3\,211\,264]};
+\end{axis}
+\end{tikzpicture}}{One $3\times3$ convolution, $3\to64$ channels, on a
+$224\times224$ image: under two thousand parameters, but over three million
+output values that must be kept for the backward pass (per image).}
+
+Also: one update step needs exactly \textbf{one} forward and \textbf{one}
+backward pass. Statements with ``multiple passes'' are false.
+
+\sub{Gate rules}
+
+\begin{yours}
+``Addition nodes backpropagate their inputs'' was ticked as true.
+\end{yours}
+\begin{correct}
+Only ``Backpropagation allows for efficient optimization of computational graphs
+with gradient descent''.
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}[
+    gate/.style={circle, draw=accent, fill=accent!8, thick, minimum size=0.9cm,
+      font=\sffamily\bfseries},
+    fwd/.style={-{Latex[length=2mm]}, rightc!80!black, thick},
+    bwd/.style={-{Latex[length=2mm]}, wrongc, thick, dashed},
+    val/.style={font=\sffamily\small, text=rightc!80!black},
+    grd/.style={font=\sffamily\small, text=wrongc}]
+  \foreach \op/\name/\z/\gx/\gy/\rl [count=\i] in {
+      +/add/2/2/2/{distributes},
+      $\times$/mul/-3/-2/6/{switches inputs},
+      max/max/3/2/0/{routes}} {
+    \begin{scope}[xshift=(\i-1)*5.2cm]
+      \node[gate] (g) at (0,0) {\op};
+      \node[val] (x) at (-2,0.8) {$x=3$};
+      \node[val] (y) at (-2,-0.8) {$y=-1$};
+      \node[val] (z) at (1.9,0) {$z=\z$};
+      \draw[fwd] (x.east) -- (g);
+      \draw[fwd] (y.east) -- (g);
+      \draw[fwd] (g) -- (z);
+      \draw[bwd] ([yshift=-3pt]z.south west) to[bend left=25] ([yshift=-3pt]g.south east);
+      \node[grd, anchor=north] at ([yshift=-4pt]z.south) {$g=2$};
+      \node[grd] at (-1.1,1.25) {$\partial x = \gx$};
+      \node[grd] at (-1.1,-1.25) {$\partial y = \gy$};
+      \node[font=\sffamily\small\bfseries, text=accent] at (0,-2) {\rl};
+    \end{scope}}
+\end{tikzpicture}}{Forward values (green) and backward gradients (red) for the
+same inputs $x=3$, $y=-1$ and upstream gradient $g=2$. Only the multiplication
+node uses the input values, and it swaps them: $\partial x = g\cdot y$,
+$\partial y = g\cdot x$.}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  Node & Forward & Backward (upstream gradient $g$) \\
+  \midrule
+  Addition $z=x+y$ & sum & $\partial x = g$, $\partial y = g$ \quad (copy the gradient) \\
+  Multiplication $z=xy$ & product & $\partial x = g\,y$, $\partial y = g\,x$ \quad (swap the inputs) \\
+  Max $z=\max(x,y)$ & maximum & $g$ to the larger input, $0$ to the other \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{why}
+The addition node passes on the \emph{gradient}, never its inputs.
+Backpropagation also does \emph{not} reduce SGD noise (that comes from
+mini-batches) and does \emph{not} guarantee the optimum (the loss is non-convex).
+It only computes the exact gradient efficiently.
+\end{why}
+
+\sub{Gradients of squared and absolute error}
+
+\begin{question}
+$l_1=(y_{GT}-y)^2$ (MSE), $l_2=|y_{GT}-y|$ (MAE). For four pairs $(y,y_{GT})$,
+compare $|\partial l_1/\partial y|$ with $|\partial l_2/\partial y|$.
+\end{question}
+\begin{yours}
+Two cases were judged by the size of the \emph{error} instead of the size of the
+\emph{gradient}: for $|e|=0.2$, ``MSE gradient larger'' was accepted, and for
+$|e|=0.1$, ``MSE gradient smaller'' was rejected.
+\end{yours}
+\begin{correct}
+MSE gradient larger for $|e|=5$; equal for $|e|=0.5$; smaller for $|e|=0.2$ and
+$|e|=0.1$.
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.72\linewidth, height=5.4cm, domain=0:2.2, samples=2,
+    xlabel={$|e| = |y-y_{GT}|$}, ylabel={gradient magnitude}, axis lines=left,
+    xmin=0, xmax=2.3, ymin=0, ymax=4.6, xtick={0,0.5,1,2}, ytick={0,1,2,4},
+    tick label style={font=\scriptsize}, label style={font=\small},
+    legend style={font=\sffamily\small, draw=none, at={(0.02,0.98)}, anchor=north west},
+    legend cell align=left]
+  \addplot[very thick, accent] {2*x};
+  \addplot[very thick, hookc] {1};
+  \legend{MSE: $2|e|$, MAE: $1$}
+  \draw[dashed, black!40] (axis cs:0.5,0) -- (axis cs:0.5,1);
+  \addplot[only marks, mark=*, mark size=2.3pt, rightc] coordinates {(0.5,1) (0.2,0.4) (0.1,0.2)};
+  \node[font=\sffamily\scriptsize, anchor=south east] at (axis cs:0.48,1.05) {equal};
+  \node[font=\sffamily\scriptsize, anchor=north west] at (axis cs:0.22,0.38) {$0.2$};
+  \node[font=\sffamily\scriptsize, anchor=south east] at (axis cs:0.09,0.24) {$0.1$};
+  \node[font=\sffamily\scriptsize, anchor=west, text=accent] at (axis cs:1.15,0.55) {$|e|=5$ lies off the chart ($10>1$)};
+\end{axis}
+\end{tikzpicture}}{The MSE gradient grows with the error, the MAE gradient stays
+at 1. They cross at $|e|=0.5$. Below that point MAE pushes harder, above it MSE.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Differentiate: $\frac{\partial}{\partial y}(y_{GT}-y)^2=-2(y_{GT}-y)$,
+        magnitude $2|e|$. \quad $\frac{\partial}{\partial y}|y_{GT}-y|=\pm1$,
+        magnitude $1$.
+  \item Compare $2|e|$ with $1$ for each case:
+\end{enumerate}
+\centering\small
+\begin{tabular}{@{}ccccccc@{}}
+  \toprule
+  $y$ & $y_{GT}$ & $|e|$ & MSE $2|e|$ & MAE & claimed & \\
+  \midrule
+  $5$ & $10$ & $5$ & $10$ & $1$ & $>$ & \ok \\
+  $1.2$ & $1$ & $0.2$ & $0.4$ & $1$ & $>$ & \bad \\
+  $6.5$ & $7$ & $0.5$ & $1$ & $1$ & $=$ & \ok \\
+  $0.1$ & $0$ & $0.1$ & $0.2$ & $1$ & $<$ & \ok \\
+  \bottomrule
+\end{tabular}
+\end{steps}
+
+\begin{hook}
+Threshold $|e|=\tfrac12$ (for $e^2$ without a factor $\tfrac12$). With
+$\tfrac12e^2$ the gradient is $|e|$ and the threshold moves to $1$.
+\end{hook}
+
+\sub{Reasons for SGD}
+
+\begin{yours}
+``SGD converges with fewer steps'' was ticked; ``a batch gradient points
+approximately in the direction of the full gradient'' was missed.
+\end{yours}
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{5.6cm}c X@{}}
+  \toprule
+  Statement & True? & Reason \\
+  \midrule
+  fewer steps than gradient descent & \bad & noisier steps, usually
+    \emph{more} of them; each step is cheaper \\
+  batch gradient $\approx$ direction of full gradient & \ok & unbiased estimate
+    of the full gradient \\
+  cost per step independent of dataset size & \ok & depends on batch size only \\
+  lower training error & \bad & no such guarantee \\
+  \bottomrule
+\end{tabularx}
+\end{center}
+
+\sub{Universal approximation}
+
+\begin{yours}
+``A neural network can approximate \emph{any} function'' was ticked as true.
+\end{yours}
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{5.6cm}c X@{}}
+  \toprule
+  Statement & True? & Reason \\
+  \midrule
+  can approximate \emph{any} function & \bad & only continuous functions on a
+    compact domain; not discontinuous ones \\
+  theorem says how to find optimal parameters & \bad & pure existence statement \\
+  can approximate non-differentiable functions & \ok & $|x|$ is continuous; ReLU
+    nets are piecewise linear \\
+  can approximate any continuous function on a compact set & \ok & the theorem
+    itself \\
+  \bottomrule
+\end{tabularx}
+\end{center}
+
+\sub{Bias, variance, and model complexity}
+
+\begin{yours}
+``A model with high bias tends to underfit the data'' was missed.
+\end{yours}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.8\linewidth, height=6cm, domain=0.5:9, samples=100,
+    xlabel={model complexity}, ylabel={error}, ymin=0, ymax=1.4,
+    xtick=\empty, ytick=\empty, axis lines=left,
+    label style={font=\sffamily\small},
+    legend style={font=\sffamily\small, draw=none, at={(0.98,0.98)}, anchor=north east}]
+  \fill[whyc!8] (axis cs:0.5,0) rectangle (axis cs:3.2,1.4);
+  \fill[wrongc!8] (axis cs:5.8,0) rectangle (axis cs:9,1.4);
+  \addplot[thick, rightc] {1.3*exp(-0.45*x)+0.03};
+  \addplot[thick, hookc] {1.3*exp(-0.45*x)+0.03+0.012*x^2};
+  \legend{training error, validation error}
+  \node[font=\sffamily\small, text=whyc, align=center] at (axis cs:1.85,1.25)
+    {underfitting\\high bias};
+  \node[font=\sffamily\small, text=wrongc, align=center] at (axis cs:7.4,0.35)
+    {overfitting\\high variance};
+  \draw[dashed, black!50] (axis cs:4.5,0) -- (axis cs:4.5,1.4);
+  \node[font=\sffamily\scriptsize, text=black!60, rotate=90, anchor=south]
+    at (axis cs:4.5,0.7) {best model};
+\end{axis}
+\end{tikzpicture}}{Training error always falls with complexity. Validation error
+falls, then rises again. High bias sits on the left (both errors high), high
+variance on the right (small training, large validation error).}
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}Xcp{6.3cm}@{}}
+  \toprule
+  Statement & True? & Reason \\
+  \midrule
+  Small training error $\Rightarrow$ sufficient complexity & \ok & the model is
+    flexible enough to fit the data \\
+  Small validation error $\Rightarrow$ good performance & \ok & unseen data
+    estimates generalization \\
+  Small training error $\Rightarrow$ good performance & \bad & the model could
+    overfit (right side of the plot) \\
+  High bias $\Rightarrow$ underfitting & \ok & too simple, it misses even the
+    training data (left side) \\
+  \bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{hook}
+\textbf{B}ias $=$ \textbf{B}elow the data (underfit). \quad
+\textbf{V}ariance $=$ \textbf{V}olatile, fits the noise (overfit).
+\end{hook}
+
+\sub{Fixing underfitting}
+
+\begin{yours}
+``More data'' was ticked; ``wider architecture'' was missed.
+\end{yours}
+
+\fig{%
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners=3pt, thick, align=center, font=\sffamily\small,
+      minimum width=4.6cm, minimum height=1.9cm}]
+  \node[box, draw=whyc, fill=whyc!8] (u) {\textbf{underfitting}\\train error high\\[2pt]
+    \textcolor{rightc}{wider, deeper,}\\\textcolor{rightc}{train longer}};
+  \node[box, draw=wrongc, fill=wrongc!8, right=1.2cm of u] (o) {\textbf{overfitting}\\train low, val.\ high\\[2pt]
+    \textcolor{rightc}{more data, regularize,}\\\textcolor{rightc}{early stopping}};
+\end{tikzpicture}}{Different problems, different cures. More data fights
+overfitting; an underfitting model already fails on the data it has. Batch
+normalization helps optimization but adds no capacity.}
+
+\begin{hook}
+Underfitting $=$ too \textbf{little capacity}: add units (wider) or layers
+(deeper). ``More data'' is the cure for the \emph{other} problem.
+\end{hook}
+
+% =================================================================
+\clearpage
+\topic{Convolutional Networks}{}\label{sec:cnn}
+
+A convolutional layer is defined by its kernel tensor: kernel size, input
+channels, output channels. Parameter counts, width versus depth, and the
+comparison with MLPs all follow from this tensor; pooling adds invariance on
+top.
+
+\sub{Number of weights}
+
+\begin{question}
+A $3\times3$ convolution maps a $32\times32\times12$ input to a
+$16\times16\times28$ output. How many weights (without biases)?
+\end{question}
+\begin{yours}
+$252 = 3\cdot3\cdot28$: the input channels were forgotten.
+\end{yours}
+\begin{correct}
+$3\cdot3\cdot12\cdot28 = 3024$
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}[x={(1cm,0)}, y={(0,1cm)}]
+  \cuboid{0}{0}{3}{3}{1.3}{whyc}
+  \node[font=\sffamily\small, align=center] at (1.9,-0.55) {input\\$32\times32\times\mathbf{12}$};
+  \cuboid{1.9}{1.6}{0.45}{0.45}{1.3}{hookc}
+  \cuboid{5.2}{1.1}{0.6}{0.6}{1.3}{hookc}
+  \node[font=\sffamily\small, align=center] at (5.9,-0.55) {one filter\\$3\times3\times\mathbf{12}$};
+  \node[font=\sffamily\bfseries, text=hookc] at (7.3,1.8) {$\times\,28$};
+  \cuboid{8.6}{0.4}{1.6}{1.6}{2.6}{rightc}
+  \node[font=\sffamily\small, align=center] at (10.2,-0.55) {output\\$16\times16\times\mathbf{28}$};
+  \draw[-{Latex[length=2mm]}, thick, black!50] (4.1,1.8) -- (5.0,1.8);
+\end{tikzpicture}}{Every filter spans the \emph{full input depth}
+($3\times3\times12 = 108$ weights). One filter produces one output channel, so
+$28$ filters are needed. The spatial sizes ($32\to16$) do not enter the count;
+they only reveal the stride.}
+
+\begin{steps}
+\[
+\#\text{weights} = K_h\cdot K_w\cdot C_\text{in}\cdot C_\text{out}
+ = 3\cdot3\cdot12\cdot28 = 3024,
+\qquad \#\text{biases} = C_\text{out} = 28 .
+\]
+Stride: $W_\text{out} = \left\lfloor \frac{W_\text{in}+2P-K}{S}\right\rfloor + 1$.
+Halving the size ($148\to74$ with $K=3$, $P=1$) means $S=2$.
+\end{steps}
+
+\sub{More filters in one layer}
+
+\begin{yours}
+``Higher abstraction capabilities of the layer'' was ticked as an effect of
+adding filters.
+\end{yours}
+\begin{correct}
+Increase in output dimensionality; increased number of features the layer can
+respond to.
+\end{correct}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  Change & What it adds & Abstraction? \\
+  \midrule
+  More filters (\textbf{width}) & more output channels $=$ more feature detectors
+    at the same level & \bad \\
+  More layers (\textbf{depth}) & larger receptive field, features of features & \ok \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\sub{Effects of max pooling}
+
+\begin{yours}
+``Translation equivariance'' was ticked instead of ``translation invariance''.
+\end{yours}
+\begin{correct}
+Dimensionality reduction, translation invariance, loss of spatial/relational
+information.
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}[scale=0.5]
+  \poolgrid{0}{0}{0}{0}
+  \node[font=\sffamily\small] at (2,-0.8) {input};
+  \draw[-{Latex[length=2mm]}, thick] (4.4,2) -- node[above, font=\sffamily\scriptsize] {max pool} (7.1,2);
+  \draw[black!40] (7.5,1) grid ++(2,2);
+  \fill[hookc!60] (7.5,2) rectangle ++(1,1);
+  \draw[black!40] (7.5,1) grid ++(2,2);
+  \draw[accent, very thick] (7.5,1) rectangle ++(2,2);
+  \node[font=\sffamily\small\bfseries] at (8,2.5) {9};
+  \poolgrid{13}{0}{1}{1}
+  \node[font=\sffamily\small] at (15,-0.8) {shifted by one pixel};
+  \draw[-{Latex[length=2mm]}, thick] (17.4,2) -- node[above, font=\sffamily\scriptsize] {max pool} (20.1,2);
+  \draw[black!40] (20.5,1) grid ++(2,2);
+  \fill[hookc!60] (20.5,2) rectangle ++(1,1);
+  \draw[black!40] (20.5,1) grid ++(2,2);
+  \draw[accent, very thick] (20.5,1) rectangle ++(2,2);
+  \node[font=\sffamily\small\bfseries] at (21,2.5) {9};
+  \node[font=\sffamily\small, text=rightc] at (21.5,-0.8) {same output};
+\end{tikzpicture}}{A small shift inside a $2\times2$ pooling block does not change
+the pooled output: \textbf{invariance}. The price is that the exact position is
+lost. An \emph{equivariant} operation (convolution) would shift its output along
+with the input.}
+
+\begin{hook}
+\textbf{Conv $=$ Equivariant} (output moves with the input). \quad
+\textbf{Pool $=$ Invariant} (output stays).
+\end{hook}
+
+\sub{True for CNNs but not for MLPs}
+
+\begin{yours}
+``Batch normalization improves stability and convergence'' was ticked, although
+it holds for MLPs too; ``more parameters do not necessarily mean more features''
+was missed.
+\end{yours}
+
+\begin{steps}
+For every statement ask two questions: true for CNN? \emph{and} false for MLP?
+Only ``yes, yes'' counts.
+\end{steps}
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{5.3cm}ccX@{}}
+  \toprule
+  Statement & CNN & MLP & Reason \\
+  \midrule
+  translation equivariant & \ok & \bad & shared kernel slides; MLP weights are
+    position specific \\
+  batch norm stabilizes training & \ok & \ok & works for any layer type \\
+  no activations $\Rightarrow$ $n$ layers $=$ 1 layer & \ok & \ok & composition
+    of linear maps is linear \\
+  more parameters $\not\Rightarrow$ more features & \ok & \bad & larger kernel adds
+    weights, not channels; in an MLP more weights need more units \\
+  \bottomrule
+\end{tabularx}
+\end{center}
+
+% =================================================================
+\clearpage
+\topic{Recurrent Networks}{}\label{sec:rnn}
+
+Backpropagation through time is ordinary backpropagation on the unrolled
+network. The only question is how many paths lead from the output to the
+variable of interest: an input enters at one time step, the shared weight at
+every time step.
+
+\sub{Derivative with respect to an input}
+
+This task was left blank.
 
 \begin{question}
 RNN cell $h_t = a\,h_{t-1} + a\,x_t$ with $a=1$, $h_0=0$, sequence
@@ -883,167 +1900,87 @@ gradient travels backwards (red) and picks up one factor $a$ per step.}
 \end{tikzpicture}}{The same product $a^T$ explains the vanishing and exploding
 gradient problem of RNNs.}
 
-% ================================================================= 10
-\topic{Maximum Likelihood Estimation}{Q29}\label{sec:mle}
+\sub{Derivative with respect to the shared weight}
 
 \begin{question}
-Error counts $X=\{2,8,4,2,6\}$, model $P(k)=\lambda^k e^{-\lambda}/k!$.
-Find $\lambda_\text{MLE}$.
+Cell $h_t=a\,h_{t-1}+a\,x_t$, $a=9$, $x_1=9$, $x_2=6$, $h_0=0$. Find
+$\partial h_2/\partial a$.
 \end{question}
-\begin{correct}
-$\lambda_\text{MLE} = \bar{k} = 22/5 = 4.40$
-\end{correct}
-
-\begin{steps}
-\begin{enumerate}[leftmargin=*]
-  \item Likelihood (product over samples):
-        $L(\lambda) = \prod_i \lambda^{k_i}e^{-\lambda}/k_i!$
-  \item Log-likelihood: $\ell(\lambda) = \big(\sum_i k_i\big)\ln\lambda - n\lambda
-        - \sum_i\ln k_i!$
-  \item Derivative $=0$: $\frac{\sum_i k_i}{\lambda} - n = 0$
-        $\;\Rightarrow\; \lambda_\text{MLE} = \frac1n\sum_i k_i$
-  \item Insert: $(2+8+4+2+6)/5 = 22/5 = 4.40$
-\end{enumerate}
-\end{steps}
-
-\fig{%
-\begin{tikzpicture}
-\begin{axis}[
-    width=0.66\linewidth, height=5cm, domain=1:10, samples=100,
-    xlabel={$\lambda$}, ylabel={$\ell(\lambda)$ (up to a constant)},
-    axis lines=left, ymin=0, ymax=12.5,
-    tick label style={font=\scriptsize}, label style={font=\small}]
-  \addplot[thick, accent] {22*ln(x)-5*x};
-  \draw[dashed, hookc] (axis cs:4.4,0) -- (axis cs:4.4,10.6);
-  \addplot[only marks, mark=*, mark size=2.5pt, hookc] coordinates {(4.4,10.595)};
-  \node[font=\sffamily\small, text=hookc, anchor=south] at (axis cs:4.4,10.8)
-    {$\lambda_\text{MLE}=4.4$};
-\end{axis}
-\end{tikzpicture}}{The log-likelihood $22\ln\lambda - 5\lambda$ peaks at the
-sample mean.}
-
-\begin{center}\small
-\begin{tabular}{@{}ll@{}}
-  \toprule
-  Distribution & MLE \\
-  \midrule
-  Poisson $\lambda$ & sample mean \\
-  Bernoulli $p$ & fraction of ones \\
-  Gaussian $\mu$ & sample mean \\
-  Gaussian $\sigma^2$ & $\frac1n\sum_i(x_i-\hat\mu)^2$ (divide by $n$, not $n-1$) \\
-  Exponential $\lambda$ & $1/$sample mean \\
-  \bottomrule
-\end{tabular}
-\end{center}
-
-% ================================================================= 11
-\topic{Bayesian Posterior}{Q30}\label{sec:bayes}
-
-\begin{question}
-$P(D\mid\Omega_1)=0.52$, $P(D\mid\Omega_2)=0.58$, $P(\Omega_1)=0.53$,
-$P(\Omega_2)=0.47$. Find $P(\Omega_1\mid D)$ to four decimals.
-\end{question}
-\begin{correct}
-$0.5027$
-\end{correct}
-
-\fig{%
-\begin{tikzpicture}[x=20cm]
-  \fill[accent!70] (0,0) rectangle (0.2756,1);
-  \fill[hookc!70] (0.2756,0) rectangle (0.5482,1);
-  \node[text=white, font=\sffamily\small, align=center] at (0.1378,0.5)
-    {$\Omega_1$: $0.52\cdot0.53 = 0.2756$};
-  \node[text=white, font=\sffamily\small, align=center] at (0.4119,0.5)
-    {$\Omega_2$: $0.58\cdot0.47 = 0.2726$};
-  \draw[decorate, decoration={brace, amplitude=6pt, mirror}, thick]
-    (0,-0.15) -- node[below=7pt, font=\sffamily\small]
-    {evidence $P(D) = 0.5482$} (0.5482,-0.15);
-  \draw[decorate, decoration={brace, amplitude=6pt}, thick, accent]
-    (0,1.15) -- node[above=7pt, font=\sffamily\small, text=accent]
-    {$P(\Omega_1\mid D) = 0.2756/0.5482 = 0.5027$} (0.2756,1.15);
-\end{tikzpicture}}{Each bar is likelihood $\times$ prior. The posterior is one
-bar's share of the total. $\Omega_2$ has the higher likelihood, but its lower prior
-makes $\Omega_1$ slightly more probable.}
-
-\begin{steps}
-\begin{enumerate}[leftmargin=*]
-  \item Numerator per hypothesis: likelihood $\times$ prior.
-  \item Evidence: sum of \emph{all} numerators.
-  \item Posterior: own numerator $/$ evidence. Check that all posteriors sum to 1
-        ($0.5027 + 0.4973$).
-  \item Keep four or more decimals in between; round only at the end.
-\end{enumerate}
-\end{steps}
-
-% ================================================================= 12
-\topic{Discriminant Functions}{Q31}\label{sec:disc}
-
 \begin{yours}
-$P(\omega_i)$ and $\sqrt{p(x\mid\omega_i)P(\omega_i)}$ \quad --- missed
-$P(\omega_i\mid x)$.
+81: this is $h_1$, only one of the paths through which $a$ acts.
 \end{yours}
 \begin{correct}
-$\sqrt{p(x\mid\omega_i)P(\omega_i)}$ and $P(\omega_i\mid x)$.
+$\partial h_2/\partial a = 2a\,x_1 + x_2 = 162+6 = 168$
 \end{correct}
 
-\begin{why}
-$g_i(x)$ is a valid discriminant function if it \textbf{ranks the classes like
-the posterior} $P(\omega_i\mid x)$ for \textbf{every} $x$. The posterior itself
-qualifies trivially, and so does any strictly increasing transform applied equally
-to all classes. $P(\omega_i)$ ignores $x$: it picks the same class for every input.
-\end{why}
-
 \fig{%
-\begin{tikzpicture}
-\pgfplotsset{small panel/.style={
-    width=0.37\linewidth, height=4.3cm, domain=-3:5, samples=100,
-    xlabel={$x$}, axis lines=left, xtick=\empty, ytick=\empty,
-    label style={font=\small}, title style={font=\sffamily\small}}}
-\begin{axis}[small panel, title={$p(x\mid\omega_i)P(\omega_i)$}, ymin=0, ymax=0.3]
-  \addplot[thick, accent] {0.7*exp(-x^2/2)/sqrt(2*pi)};
-  \addplot[thick, hookc] {0.3*exp(-(x-2)^2/2)/sqrt(2*pi)};
-  \draw[dashed, black!50] (axis cs:1.424,0) -- (axis cs:1.424,0.3);
-\end{axis}
-\begin{axis}[small panel, xshift=0.34\linewidth, title={$\sqrt{p(x\mid\omega_i)P(\omega_i)}$}, ymin=0, ymax=0.55]
-  \addplot[thick, accent] {sqrt(0.7*exp(-x^2/2)/sqrt(2*pi))};
-  \addplot[thick, hookc] {sqrt(0.3*exp(-(x-2)^2/2)/sqrt(2*pi))};
-  \draw[dashed, black!50] (axis cs:1.424,0) -- (axis cs:1.424,0.55);
-\end{axis}
-\begin{axis}[small panel, xshift=0.68\linewidth, title={$P(\omega_i)$ alone}, ymin=0, ymax=0.85]
-  \addplot[thick, accent] {0.7};
-  \addplot[thick, hookc] {0.3};
-  \node[font=\sffamily\scriptsize, text=wrongc] at (axis cs:1,0.5) {no boundary};
-\end{axis}
-\end{tikzpicture}}{Two classes with priors $0.7$ and $0.3$. The square root
-changes the curves but not where they cross, so the decision boundary (dashed) is
-the same. The priors alone never cross: every $x$ goes to class 1.}
+\begin{tikzpicture}[
+    cell/.style={draw=accent, fill=accent!8, rounded corners=3pt, thick,
+      minimum width=1.5cm, minimum height=0.9cm, font=\sffamily},
+    inp/.style={font=\sffamily},
+    fwd/.style={-{Latex[length=2.2mm]}, thick, black!60},
+    use/.style={font=\small, text=hookc, fill=white, inner sep=1.5pt}]
+  \node[inp] (h0) at (0,0) {$h_0=0$};
+  \node[cell] (h1) at (3.2,0) {$h_1=81$};
+  \node[cell] (h2) at (6.8,0) {$h_2$};
+  \node[inp] (x1) at (3.2,-2) {$x_1=9$};
+  \node[inp] (x2) at (6.8,-2) {$x_2=6$};
+  \draw[fwd] (h0) -- node[use, above] {$a$ \#1} (h1);
+  \draw[fwd] (h1) -- node[use, above] {$a$ \#3} (h2);
+  \draw[fwd] (x1) -- node[use, right] {$a$ \#2} (h1);
+  \draw[fwd] (x2) -- node[use, right] {$a$ \#4} (h2);
+  \node[font=\sffamily\small, align=left, anchor=west] at (8.3,0.2)
+    {$h_2 = a\,h_1 + a\,x_2$\\[2pt]
+     $h_1 = a\,h_0 + a\,x_1$};
+\end{tikzpicture}}{The weight $a$ is used four times. The derivative collects one
+contribution from every use; the answer 81 stops after one of them.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Fast way, unroll to a closed form:}
+        $h_1=a x_1$, \; $h_2=a h_1+a x_2 = a^2x_1+a x_2$.
+  \item Differentiate as an ordinary polynomial in $a$:
+        $\dfrac{\partial h_2}{\partial a}=2a x_1+x_2 = 2\cdot9\cdot9+6=168$.
+  \item \textbf{Check with the recursive BPTT rule} (product rule, since $h_{t-1}$
+        also depends on $a$):
+        \[
+          \frac{\partial h_t}{\partial a}
+          = h_{t-1} + x_t + a\,\frac{\partial h_{t-1}}{\partial a}.
+        \]
+        $t=1$: $0+9+9\cdot0=9$. \quad $t=2$: $81+6+9\cdot9=168$.
+\end{enumerate}
+\end{steps}
 
 \begin{center}\small
-\begin{tabular}{@{}ll@{}}
+\begin{tabular}{@{}lll@{}}
   \toprule
-  Candidate $g_i(x)$ & Valid? \\
+  Asked for & Formula (this cell) & Pitfall \\
   \midrule
-  $P(\omega_i\mid x)$ & \ok{} always (the reference) \\
-  $p(x\mid\omega_i)P(\omega_i)$ & \ok{} always (posterior $\times$ $p(x)$, same for all classes) \\
-  $\sqrt{\cdot}$, $\ln(\cdot)$ of the above & \ok{} always (strictly increasing) \\
-  $p(x\mid\omega_i)$ & \bad{} only if all priors are equal \\
-  $P(\omega_i)$ & \bad{} only if all likelihoods are identical \\
-  $1/g_i$, $-g_i$ & \bad{} never (ranking reversed) \\
+  $\partial h_T/\partial x_1$ (input) & $a^T$ & one path only \\
+  $\partial h_2/\partial a$ (shared weight) & $2a x_1+x_2$ & sum over \emph{all} uses of $a$ \\
   \bottomrule
 \end{tabular}
 \end{center}
 
 \begin{hook}
-Quick test: does it use \textbf{likelihood and prior together} (or the posterior
-directly), combined by an increasing function? Then it is valid.
+Derivative w.r.t.\ an \textbf{input}: one chain of factors. Derivative w.r.t.\ the
+\textbf{shared weight}: a \textbf{sum} over every time step (product rule).
+Safest: unroll to a formula in $a$, then differentiate.
 \end{hook}
 
-% ================================================================= 13
-\topic{Generative Adversarial Networks}{Q33}\label{sec:gan}
+% =================================================================
+\clearpage
+\topic{Generative Adversarial Networks}{}\label{sec:gan}
+
+A GAN couples two networks through one loss. The mistake here was to treat the
+generator as if it were trained separately from the discriminator; the table
+also covers the related trap of reading the generator as a density estimator.
+
+\sub{How the generator is trained}
 
 \begin{yours}
-Marked ``The computation of backpropagation for the generator is independent of
-the discriminator'' as true.
+``The computation of backpropagation for the generator is independent of the
+discriminator'' was marked as true.
 \end{yours}
 
 \fig{%
@@ -1093,26 +2030,60 @@ to reach G. Without D there is no training signal for G.}
 \begin{hook}
 Explicit density estimators: MLE, Parzen windows, (restricted) Boltzmann machines.
 A GAN only \emph{samples}. Check whether the question asks for ``estimating a
-distribution'' or ``generating samples'' (Q28).
+distribution'' or ``generating samples''.
 \end{hook}
 
-% ================================================================= checklist
+% =================================================================
+\clearpage
 \topic{Checklist Before Submitting}{}\label{sec:check}
 
+One line per habit, sorted by chapter. Run through the list in the last minutes
+of the exam.
+
+\newcommand{\cgroup}[1]{\multicolumn{2}{@{}l}{\rule{0pt}{3ex}\sffamily\bfseries\color{accent}#1}\\[1pt]}
 \begin{center}
 \begin{tabularx}{\linewidth}{@{}c>{\raggedright\arraybackslash}X@{}}
-  $\square$ & Multi-select: every option judged on its own? \\
-  $\square$ & ``always'', ``only'', ``necessarily'' checked? \\
-  $\square$ & Invariance/equivariance, inputs/gradients, width/depth not swapped? \\
-  $\square$ & Hough: $\rho = x\cos\theta + y\sin\theta$ computed for every option? \\
-  $\square$ & Conv parameters: $K\cdot K\cdot C_\text{in}\cdot C_\text{out}$, spatial size irrelevant? \\
-  $\square$ & R-table: orientation range ($\bmod 180^\circ$ or $\bmod 360^\circ$) checked? \\
-  $\square$ & Histograms: axis orientation fixed with the unambiguous patch? \\
+  \cgroup{Multiple choice}
+  $\square$ & Every option judged on its own, including the ``easy'' ones? \\
+  $\square$ & ``always'', ``only'', ``any'', ``fewer'' tested with one counterexample? \\
+  $\square$ & ``A but not B'': both halves checked for every statement? \\
+  $\square$ & Partner concepts not swapped (invariance/equivariance, width/depth, gradient/input)? \\
+  $\square$ & Numeric: formula with all terms written first; result plausible? \\
+  \cgroup{Vision tasks and pipeline}
+  $\square$ & System tasks: every output mapped to its task (identity $=$ recognition)? \\
+  $\square$ & Pipeline stage chosen by input/output type (image in, image out $=$ data prep.)? \\
+  $\square$ & Detector: sliding window, pyramid, boxes \emph{and} NMS? \\
+  \cgroup{Histograms, entropy, saliency}
+  $\square$ & Histogram axis orientation fixed with the unambiguous patch? \\
+  $\square$ & Entropy only depends on bar heights (swap, shuffle, mirror keep it)? \\
   $\square$ & Saliency: entropy \emph{peak over scale}, not maximum entropy? \\
-  $\square$ & Bayes: evidence $=$ sum over \emph{all} hypotheses, round only at the end? \\
-  $\square$ & Discriminant: likelihood \emph{and} prior (or the posterior)? \\
-  $\square$ & BPTT: unroll, one factor per time step, ignore distractor values? \\
+  \cgroup{Hough and template matching}
+  $\square$ & $\rho = x\cos\theta + y\sin\theta$ computed for every candidate? \\
+  $\square$ & Votes $=$ product of bins of the \emph{free} parameters only? \\
+  $\square$ & R-table: orientation range ($\bmod 180^\circ$ or $\bmod 360^\circ$) checked? \\
+  $\square$ & Correlation theorem: exactly one conjugate? \\
+  \cgroup{Bayesian decisions}
+  $\square$ & Evidence $=$ sum over \emph{all} hypotheses; round only at the end? \\
+  $\square$ & Risk: one term per true state; result between the column's min and max loss? \\
+  $\square$ & Discriminant: likelihood \emph{and} prior (or the posterior), increasing transform? \\
+  $\square$ & Shared $\Sigma$ $\to$ linear, own $\Sigma_i$ $\to$ quadric? \\
+  $\square$ & ``Expected'' value: is $x$ integrated out? \\
+  \cgroup{Estimation}
+  $\square$ & MLE: log-likelihood, derivative, solve; answer is the parameter? \\
+  $\square$ & Probability inside $[0,1]$? Waiting times $\to 1/\bar k$? \\
+  $\square$ & MSE $=$ bias$^2$ $+$ variance; ``always lowest MSE'' tested? \\
+  \cgroup{Neural networks}
+  $\square$ & Backprop memory $\propto$ stored activations, not parameters? \\
+  $\square$ & MSE vs.\ MAE gradient: compared $2|e|$ with $1$? \\
+  $\square$ & SGD: cheaper steps, not fewer steps? \\
+  $\square$ & Universal approximation: continuous on compact domain, existence only? \\
+  $\square$ & Underfitting $\to$ wider/deeper; overfitting $\to$ more data/regularize? \\
+  \cgroup{CNNs}
+  $\square$ & Conv parameters: $K\cdot K\cdot C_\text{in}\cdot C_\text{out}$, spatial size irrelevant? \\
+  $\square$ & Pooling $=$ invariance, convolution $=$ equivariance? \\
+  \cgroup{RNNs and GANs}
+  $\square$ & BPTT w.r.t.\ input: one factor per step; w.r.t.\ weight: sum over every use? \\
+  $\square$ & GAN: generator gradient flows through the discriminator? \\
 \end{tabularx}
 \end{center}
-
 \end{document}

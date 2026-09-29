@@ -268,16 +268,18 @@ minimizing the risk is maximizing the posterior.
 Two worked cases show how to compute with Equation~\eqref{eq:risk}. First, a
 diagnostic system with states $\omega_1$ (ill), $\omega_2$ (healthy), actions
 $\alpha_1$ (treat) and $\alpha_2$ (do nothing), losses
-$\lambda(\alpha_1\mid\omega_1) = 18$, $\lambda(\alpha_1\mid\omega_2) = 2$,
-$\lambda(\alpha_2\mid\omega_1) = 57$, $\lambda(\alpha_2\mid\omega_2) = 70$, and
+$\lambda(\alpha_1\mid\omega_1) = 18$, $\lambda(\alpha_1\mid\omega_2) = 27$,
+$\lambda(\alpha_2\mid\omega_1) = 57$, $\lambda(\alpha_2\mid\omega_2) = 0$, and
 $P(\omega_1\mid x) = 0.75$. The expected risk of treating is
 \begin{equation}
-  R(\alpha_1\mid x) = 18\cdot 0.75 + 2\cdot 0.25 = 14.00,
+  R(\alpha_1\mid x) = 18\cdot 0.75 + 27\cdot 0.25 = 13.50 + 6.75 = 20.25,
 \end{equation}
 \noindent
-and doing nothing would cost $57\cdot 0.75 + 70\cdot 0.25 = 60.25$, so treatment
+and doing nothing would cost $57\cdot 0.75 + 0\cdot 0.25 = 42.75$, so treatment
 is chosen. The only care needed is to read the loss table correctly: fix the
-action, then sum over the true states weighted by their posteriors. Second, a
+action (one column of the table), then sum over \emph{all} true states, each
+weighted by its posterior. The risk of an action is never a single table entry
+times a single posterior. Second, a
 binary triage with classes melanoma $M$ and benign $B$, zero cost for correct
 decisions, and a false negative five times as costly as a false positive,
 $\lambda(\mathrm{FN}) = 5\lambda(\mathrm{FP})$. The risks are
@@ -648,7 +650,8 @@ $n$. With $n = 2$ samples the estimate is essentially arbitrary; with $10$,
 $100$, and $1000$ samples the fitted Gaussian approaches the true one. A
 million samples give a very precise estimate, but only of the assumed model: if
 the data are not Gaussian (for example bimodal), more samples do not fix the
-wrong shape.
+wrong shape. How bias and variance of an estimator combine into its mean
+squared error is shown in Appendix~\ref{app:estimators}.
 
 The same recipe works for discrete models. For a count of errors per time
 interval modeled as Poisson, $P(k) = \lambda^k e^{-\lambda}/k!$, with
@@ -674,9 +677,11 @@ $P(k) = (1-p)^{k-1}p$, with $D = \{8,6,10,9,4\}$:
 The step from the derivative to the result is
 $n(1-p) = p\sum_i(k_i-1) = p\sum_i k_i - pn$, so $n = p\sum_i k_i$. The estimate
 is one over the mean waiting time, which matches intuition: failures every
-$7.4$ days on average mean a daily failure probability of about $1/7.4$. Always
-insert the model exactly as stated; the formula for $\hat p$ changes if $k$ is
-defined differently.
+$7.4$ days on average mean a daily failure probability of about $1/7.4$. A
+quick plausibility check catches the most common slip: $p$ is a probability, so
+an answer outside $[0,1]$, such as the mean $7.4$ itself, cannot be right.
+Always insert the model exactly as stated; the formula for $\hat p$ changes if
+$k$ is defined differently.
 
 \paragraph{Bayesian estimation.}
 ML treats the parameter as a fixed unknown number and picks one value. Bayesian

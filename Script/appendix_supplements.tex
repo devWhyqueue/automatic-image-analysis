@@ -116,7 +116,11 @@ correlation is the same with \emph{one} factor conjugated:
   \label{eq:corr-theorem}
 \end{equation}
 \noindent
-Conjugating both factors, or neither, does not give the correlation. The
+Which of the two factors carries the conjugate is a convention; the form
+$\mathrm{DFT}^{-1}\bigl(\mathrm{DFT}(I)\cdot\mathrm{DFT}(O)^*\bigr)$, with the
+template conjugated, is equally a correlation and only mirrors the shift axis.
+Conjugating both factors, or neither, does not give the correlation: the plain
+product is the convolution. The
 practical value is speed: a correlation of a template with a whole image costs
 two forward DFTs, a pointwise product, and one inverse DFT.
 
@@ -377,6 +381,82 @@ replace the softmax by $\hat p_i = \exp(z_i/T)/\sum_j\exp(z_j/T)$ with one scala
 $T$. A value $T>1$ makes the predictions less extreme without changing their
 ranking, so the accuracy stays the same. $T$ is fitted on validation data, never
 on the test set.
+
+\section{Estimators, Loss Gradients, and Approximation}
+\label{app:estimators}
+
+Three short facts about learning from data appear in exam questions without a
+lecture of their own: how to judge an estimator, how the choice of regression
+loss changes the gradient, and what a neural network can represent in
+principle.
+
+\paragraph{Bias, variance, and MSE of an estimator.}
+An estimator is a rule that turns a random dataset into a number, so the
+estimate is itself a random variable. Its \emph{bias} is how far it is off on
+average, its \emph{variance} is how much it scatters from dataset to dataset,
+and its mean squared error combines both:
+\begin{equation}
+  \mathrm{MSE}(\hat\mu) = \mathbb{E}\bigl[(\hat\mu-\mu)^2\bigr]
+  = \bigl(\mathbb{E}[\hat\mu]-\mu\bigr)^2 + \operatorname{Var}(\hat\mu).
+\end{equation}
+\noindent
+For $N$ samples $X_i\sim\mathcal N(\mu,\sigma^2)$, compare three estimators of
+the mean:
+\begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    Estimator & Bias & Variance & MSE \\
+    \midrule
+    $\hat\mu_A = 0$ (ignore the data) & $-\mu$ & $0$ & $\mu^2$ \\
+    $\hat\mu_B = \frac1N\sum_i X_i$ (sample mean) & $0$ & $\sigma^2/N$ & $\sigma^2/N$ \\
+    $\hat\mu_C = X_1$ (first sample only) & $0$ & $\sigma^2$ & $\sigma^2$ \\
+    \bottomrule
+  \end{tabular}
+\end{center}
+\noindent
+A constant has zero variance, the lowest possible, and a single sample the
+highest. The sample mean has the lowest MSE only as long as
+$\sigma^2/N < \mu^2$: if the true mean happens to be close to $0$, the useless
+constant $\hat\mu_A$ wins. So no estimator is ``always'' best in MSE; an
+unbiased one is merely the safe default.
+
+\paragraph{Squared versus absolute error.}
+For a prediction $y$ and target $y_{GT}$ with error $e = y - y_{GT}$, the squared
+error $\ell_1 = e^2$ and the absolute error $\ell_2 = \lvert e\rvert$ have gradients
+of size
+\begin{equation}
+  \Bigl\lvert\frac{\partial\ell_1}{\partial y}\Bigr\rvert = 2\lvert e\rvert,
+  \qquad
+  \Bigl\lvert\frac{\partial\ell_2}{\partial y}\Bigr\rvert = 1
+  \quad (e\ne 0).
+\end{equation}
+\noindent
+The squared error pushes harder on large errors and more gently on small ones;
+the two gradients are equal exactly at $\lvert e\rvert = 0.5$. This is why the
+squared error is sensitive to outliers, while the absolute error keeps a constant
+pull even when the prediction is almost right.
+\begin{center}
+  \begin{tabular}{@{}ccccc@{}}
+    \toprule
+    $y$ & $y_{GT}$ & $\lvert e\rvert$ & $\lvert\partial_y\ell_1\rvert$ vs.\ $\lvert\partial_y\ell_2\rvert$ & \\
+    \midrule
+    $5$ & $10$ & $5$ & $10 > 1$ & squared larger \\
+    $6.5$ & $7$ & $0.5$ & $1 = 1$ & equal \\
+    $1.2$ & $1$ & $0.2$ & $0.4 < 1$ & absolute larger \\
+    $0.1$ & $0$ & $0.1$ & $0.2 < 1$ & absolute larger \\
+    \bottomrule
+  \end{tabular}
+\end{center}
+
+\paragraph{Universal approximation.}
+A network with a single hidden layer, a nonlinear activation, and enough units
+can approximate \emph{any continuous function on a compact (closed and bounded)
+domain} to any desired accuracy. Continuity is required, differentiability is
+not: $\lvert x\rvert$ or a triangle wave are reproduced exactly by ReLU units,
+since a ReLU network is itself piecewise linear. The theorem does not cover
+arbitrary functions (discontinuous ones, or unbounded domains), and it is a pure
+existence statement: it says neither how many units are needed nor how to find
+the weights. Finding them remains the job of gradient descent.
 
 \section{Graphical Models}
 \label{app:graphical}

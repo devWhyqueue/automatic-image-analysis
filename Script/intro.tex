@@ -476,7 +476,9 @@ gives one example per stage.
 The mapping column is the tool for sorting any method into its stage. Applying
 a transformation so that all images of a dataset have approximately the same
 histogram changes pixel values but still outputs images, so it is \emph{data}
-preprocessing, not feature extraction. Feature extraction maps from pixel space
+preprocessing, not feature extraction. Nor is it \emph{feature} preprocessing,
+although it ``normalizes'': feature preprocessing acts on feature vectors after
+extraction, never on the images themselves. Feature extraction maps from pixel space
 into a \emph{feature} space, not directly into the output space; turning features
 into labels is the classifier's job.
 
@@ -507,14 +509,15 @@ offset vectors.
 
 \paragraph{From classifier to detector.}
 A classifier trained on image patches of a fixed size answers only ``is this
-patch an object?'' Turning it into a detector requires three additions. First,
+patch an object?'' Turning it into a detector requires four additions. First,
 a \emph{sliding window} applies the classifier at every position of the image.
 Second, an \emph{image pyramid} rescales the image to several resolutions so
 that objects of different sizes fit the fixed window. Third, each positive
 response gives a bounding box, whose size follows from the pyramid level and
-whose position follows from the window location; overlapping boxes around the
-same object are then reduced to the strongest one by \emph{non-maxima
-suppression}.
+whose position follows from the window location. Fourth, neighboring windows
+and scales fire on the same object, so overlapping boxes are reduced to the
+strongest one by \emph{non-maxima suppression}; without this step one object
+yields a cluster of detections.
 
 \paragraph{Where deep learning fits.}
 Deep networks do not remove the stages but merge them: a single differentiable

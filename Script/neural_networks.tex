@@ -190,7 +190,10 @@ of the correct class $y$:
 \end{equation}
 \noindent
 The loss is what the optimizer sees, so it must match the task; accuracy itself
-is not differentiable and is only used to evaluate the result.
+is not differentiable and is only used to evaluate the result. How the gradients
+of squared and absolute error differ, and what the universal approximation
+theorem does and does not promise, is summarized in
+Appendix~\ref{app:estimators}.
 
 Even when the loss is convex, as for logistic regression, there is in general no
 closed-form solution for the best parameters, so the minimum has to be found
@@ -215,7 +218,13 @@ three classical variants differ only in how many examples enter one update:
 \noindent
 Offline learning follows the exact gradient of the full objective but updates
 rarely; online learning updates often but with a noisy direction. Stochastic
-gradient descent in modern practice is the mini-batch variant. Two common
+gradient descent in modern practice is the mini-batch variant. It is used for
+two reasons: the gradient of a random mini-batch points, on average, in the
+same direction as the full gradient, and the cost of one update depends only
+on the batch size, not on the size of the dataset. It does \emph{not} need
+fewer steps than full gradient descent (its steps are noisier, so it usually
+needs more of them, each far cheaper), and it does not by itself reach a lower
+training error. Two common
 additions modify the update. \emph{Momentum} (inertia) keeps part of the previous
 step, so that consistent directions accelerate and oscillations cancel,
 \begin{equation}
@@ -521,8 +530,12 @@ for simpler or more robust solutions. The standard tools are:
         regularizing side effect (Section~\ref{sec:resnet}).
 \end{itemize}
 \noindent
-More data and a smaller model act in the same direction. Table~\ref{tab:diagnosis}
-turns these ideas into a diagnosis checklist.
+More data and a smaller model act in the same direction: both fight
+overfitting. Neither helps an underfitting model, which already fails on the
+data it has; only more capacity does, that is, a wider (more units per layer)
+or deeper (more layers) network, or longer training. Batch normalization
+stabilizes optimization but adds no capacity. Table~\ref{tab:diagnosis} turns
+these ideas into a diagnosis checklist.
 
 \begin{table}[ht]
   \centering

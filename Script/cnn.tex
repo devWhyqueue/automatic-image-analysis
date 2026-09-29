@@ -385,7 +385,10 @@ parameters, whether the image has $32\times32$ or $1000\times1000$ pixels. A
 fully connected layer between the same $224\times224\times3$ input and a
 $224\times224\times64$ output would need about $150{,}528\cdot3.2\cdot10^6
 \approx 4.8\cdot10^{11}$ weights. The difference of more than eight orders of
-magnitude is the whole point of convolution.
+magnitude is the whole point of convolution. The formulas also show that
+parameters and features are decoupled: a larger kernel $K$ adds weights without
+adding a single output channel. In a fully connected layer with a fixed input,
+extra weights can only come with extra output units.
 
 Channels widen what a layer computes at one position; depth widens how much of
 the input a unit sees. More filters in one layer therefore raise its output
