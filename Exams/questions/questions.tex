@@ -86,20 +86,53 @@
 % =====================================================================
 \topic{Foundations of Image Analysis}{Q1--Q8}
 
-\idea{Image analysis turns raw pixels (unstructured data) into statements about
-the scene (structured data): which objects exist, where they are, which pixel
+\idea{Image analysis turns raw pixels into statements about the scene: which
+objects exist, where they are, which pixel
 belongs to what. Processing can be driven by the data (bottom-up) or by
 expectations (top-down); the tasks differ in \emph{how much} spatial detail the
 answer contains.}
 
 \q{1}{What is the difference between structured and unstructured data?}
-Structured data follows a predefined schema: tables, database records, sensor
-logs with named fields. Each value has a known meaning and can be queried
-directly (``all customers older than 30''). Unstructured data has no such
-schema: images, video, audio, free text. An image is only a grid of intensity
-values; the meaning (``there is a car at the left'') is implicit and must first
-be extracted. Automatic image analysis is exactly this conversion from
-unstructured to structured data.
+The two terms are used in two opposite senses, so the intended one must be
+clear from context.
+
+\emph{Course definition (arrangement carries meaning).} Data is
+\emph{structured} if the arrangement of its values carries information, and
+\emph{unstructured} if it does not.
+\begin{itemize}
+  \item Unstructured: an attribute list such as
+    $(70\,\mathrm{kg},\,170\,\mathrm{cm},\,32\,\mathrm{years})$. The entries can
+    be permuted without changing what is described, as long as the field names
+    are kept.
+  \item Structured: images, sound, and text. Shuffling the pixels of an image
+    destroys its content even though the multiset of intensity values stays the
+    same. Position and neighborhood \emph{are} the information.
+\end{itemize}
+\noindent
+Consequence: an image cannot be treated as an unordered bag of intensities.
+Convolution, neighborhoods, and MRFs exist to exploit this structure. In the
+exam, answer with this definition.
+
+\emph{Data-management definition (predefined schema).} In databases and data
+science the labels are reversed. Structured data follows a predefined schema
+(tables, records with named fields) and can be queried directly. Unstructured
+data has no such schema: images, video, audio, free text. Here the meaning of
+an image (``there is a car at the left'') is implicit and must first be
+extracted.
+
+\begin{table}[ht]
+  \centering\small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Example & Course (arrangement) & Data management (schema) \\
+    \midrule
+    Attribute list / table row & unstructured & structured \\
+    Image, sound, text & structured & unstructured \\
+    \bottomrule
+  \end{tabular}
+  \caption{The same examples receive opposite labels under the two
+  definitions.}
+\end{table}
 
 \q{2}{What is top-down processing?}
 Model- or knowledge-driven processing. Prior knowledge, expectations, or the
