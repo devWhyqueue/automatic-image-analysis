@@ -32,7 +32,7 @@
 \setlist{itemsep=1pt, topsep=2pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\sffamily\small\color{accent}AIA \textbullet{} Exam Questions Answered}
+\fancyhead[L]{\sffamily\small\color{accent}AIA \textbullet{} Exam Preparation Questions}
 \fancyhead[R]{\sffamily\small\color{accent}\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
@@ -72,16 +72,11 @@
   \centering\vspace*{3cm}
   {\sffamily\Huge\bfseries\color{accent} Automatic Image Analysis\par}
   \vspace{0.6cm}
-  {\sffamily\LARGE Exam Preparation Questions --- Answered\par}
-  \vspace{0.4cm}
-  {\large Parts I and II, grouped by topic\par}
+  {\sffamily\LARGE Exam Preparation Questions\par}
   \vspace{1.5cm}
   \begin{minipage}{0.8\textwidth}
-    Every question from the two preparation sheets is answered below. The
-    questions are grouped into topics; each topic opens with a short overview
-    that ties the individual answers together, and each question keeps its
-    original number so it can be found again on the sheet. Questions 59--61 do
-    not appear on either sheet and are therefore missing.
+    Answers to the exam preparation questions, grouped by topic; each topic
+    opens with a short overview that ties its answers together.
   \end{minipage}
 \end{titlepage}
 
@@ -250,7 +245,7 @@ error signals $\delta$ are propagated from the output back through the network:
   \frac{\partial E}{\partial w_{ji}} = \delta_j\, z_i .
 \]
 \noindent
-The gradients are then used in a gradient-descent update (Q112). For squared
+The gradients are then used in a gradient-descent update (Q109). For squared
 error $E=\tfrac12(z_k-t_k)^2$ the output term is $\delta_k=f'(a_k)(z_k-t_k)$.
 
 \q{15}{What does RF stand for?}
@@ -787,20 +782,20 @@ components (mixture) cover different viewpoints. Training: latent SVM, since
 part positions are not annotated, with hard-negative mining.
 
 % =====================================================================
-\topic{Probability and Bayesian Decisions}{Q62--Q79}
+\topic{Probability and Bayesian Decisions}{Q59--Q76}
 
 \idea{All rules follow from two identities: the product rule
 $P(A,B)=P(A\mid B)P(B)$ and the sum rule $P(A)=\sum_B P(A,B)$. Bayes' theorem
 combines them. Classification then means picking the class with the best
 posterior (MAP), likelihood (ML), or lowest expected cost.}
 
-\q{62}{Which properties need a function to fulfill to be a probability?}
+\q{59}{Which properties need a function to fulfill to be a probability?}
 Kolmogorov axioms, for events of a sample space $\Omega$:
 (1) $P(A)\ge 0$; (2) $P(\Omega)=1$; (3) additivity: for disjoint events
 $P(A\cup B)=P(A)+P(B)$ (countable additivity in general). Consequences:
 $0\le P(A)\le 1$, $P(\bar A)=1-P(A)$, $P(\emptyset)=0$.
 
-\q{63}{What are the differences between a probability and a probability
+\q{60}{What are the differences between a probability and a probability
 density?}
 \begin{table}[ht]
   \centering\small
@@ -818,30 +813,30 @@ density?}
   \caption{Probability versus probability density.}
 \end{table}
 
-\q{64}{What is the joint probability of two events?}
+\q{61}{What is the joint probability of two events?}
 $P(A,B) = P(A\cap B)$: the probability that $A$ \emph{and} $B$ occur together.
 
-\q{65}{What is the conditional probability of an event A given B?}
+\q{62}{What is the conditional probability of an event A given B?}
 The probability of $A$ when $B$ is known to have occurred:
 $P(A\mid B) = \dfrac{P(A,B)}{P(B)}$, defined for $P(B)>0$.
 
-\q{66}{What is marginalization?}
+\q{63}{What is marginalization?}
 Removing a variable from a joint distribution by summing (or integrating) over
 all its values (sum rule):
 $P(A) = \sum_B P(A,B) = \sum_B P(A\mid B)P(B)$, respectively
 $p(x)=\int p(x,y)\,\mathrm{d}y$.
 
-\q{67}{How can the joint probability of two events be factorized into
+\q{64}{How can the joint probability of two events be factorized into
 probabilities of the individual events?}
 Product rule: $P(A,B) = P(A\mid B)\,P(B) = P(B\mid A)\,P(A)$. For many
 variables (chain rule):
 $P(x_1,\dots,x_n) = \prod_i P(x_i\mid x_1,\dots,x_{i-1})$.
 
-\q{68}{If two events are independent, what is then known about their
+\q{65}{If two events are independent, what is then known about their
 conditional and joint probabilities?}
 $P(A\mid B) = P(A)$, $P(B\mid A)=P(B)$, and $P(A,B) = P(A)\,P(B)$.
 
-\q{69}{What is Bayes' Theorem?}
+\q{66}{What is Bayes' Theorem?}
 \[
   P(A\mid B) = \frac{P(B\mid A)\,P(A)}{P(B)}, \qquad
   P(B) = \sum_{A'} P(B\mid A')\,P(A').
@@ -850,24 +845,24 @@ $P(A\mid B) = P(A)$, $P(B\mid A)=P(B)$, and $P(A,B) = P(A)\,P(B)$.
 It turns the probability of the data given a hypothesis into the probability of
 the hypothesis given the data.
 
-\q{70}{What are the technical names of all terms in Bayes' theorem?}
+\q{67}{What are the technical names of all terms in Bayes' theorem?}
 With class $c$ and observation $x$:
 $\underbrace{P(c\mid x)}_{\text{posterior}} =
 \dfrac{\overbrace{P(x\mid c)}^{\text{likelihood}}\ \overbrace{P(c)}^{\text{prior}}}
 {\underbrace{P(x)}_{\text{evidence}}}$.
 The evidence is also called marginal likelihood or normalization constant.
 
-\q{71}{Given the joint probability of two events, derive Bayes' theorem.}
+\q{68}{Given the joint probability of two events, derive Bayes' theorem.}
 Factorize the joint in both orders (product rule):
 $P(A,B) = P(A\mid B)P(B)$ and $P(A,B)=P(B\mid A)P(A)$. Equate the right-hand
 sides, $P(A\mid B)P(B) = P(B\mid A)P(A)$, and divide by $P(B)>0$:
 $P(A\mid B) = P(B\mid A)P(A)/P(B)$. The denominator follows by
 marginalization: $P(B)=\sum_A P(B\mid A)P(A)$.
 
-\q{72}{What does MAP stand for?}
+\q{69}{What does MAP stand for?}
 \emph{Maximum A Posteriori}.
 
-\q{73}{What is the decision rule of a MAP estimator?}
+\q{70}{What is the decision rule of a MAP estimator?}
 Choose the class with the highest posterior:
 \[
   \hat c = \arg\max_c P(c\mid x) = \arg\max_c P(x\mid c)\,P(c).
@@ -876,19 +871,19 @@ Choose the class with the highest posterior:
 The evidence $P(x)$ is the same for all classes and can be dropped. MAP
 minimizes the probability of error (Bayes classifier).
 
-\q{74}{What does ML stand for (in the context of probability theory)?}
+\q{71}{What does ML stand for (in the context of probability theory)?}
 \emph{Maximum Likelihood}.
 
-\q{75}{What is the decision rule of a ML estimator?}
+\q{72}{What is the decision rule of a ML estimator?}
 Choose the class under which the observation is most likely, ignoring priors:
 $\hat c = \arg\max_c P(x\mid c)$.
 
-\q{76}{In which case are ML and MAP equivalent?}
+\q{73}{In which case are ML and MAP equivalent?}
 When the prior is uniform, $P(c)=\text{const}$ for all classes; it then does
 not change the $\arg\max$. (For parameter estimation: flat prior over
 parameters.)
 
-\q{77}{What is Naive Bayes?}
+\q{74}{What is Naive Bayes?}
 A Bayes classifier with the ``naive'' assumption that the features are
 conditionally independent given the class:
 \[
@@ -899,9 +894,9 @@ conditionally independent given the class:
 Instead of one $D$-dimensional density per class, only $D$ one-dimensional
 densities are estimated, which beats the curse of dimensionality. It often works
 well even though the assumption rarely holds exactly. Zero counts are avoided by
-the Laplace correction (Q84).
+the Laplace correction (Q81).
 
-\q{78}{How is it possible to take the cost of a decision into account?}
+\q{75}{How is it possible to take the cost of a decision into account?}
 Define a loss $\lambda(\alpha_i\mid c_j)$: the cost of action (decision)
 $\alpha_i$ when the true class is $c_j$. The conditional risk of an action is
 the expected loss under the posterior,
@@ -914,7 +909,7 @@ this reduces to MAP. Asymmetric costs shift the boundary (e.g.\ missing a tumor
 costs more than a false alarm); a ``reject'' action with fixed cost is also
 possible.
 
-\q{79}{What is a discriminant function?}
+\q{76}{What is a discriminant function?}
 One function $g_i(\mathbf{x})$ per class; $\mathbf{x}$ is assigned to the class
 with the largest value, $\hat c = \arg\max_i g_i(\mathbf{x})$. Decision
 boundaries lie where $g_i = g_j$. Choices: $g_i = P(c_i\mid\mathbf{x})$,
@@ -924,7 +919,7 @@ decisions. For two classes a single $g = g_1 - g_2$ and its sign suffice;
 linear $g$ gives a linear classifier (Q11).
 
 % =====================================================================
-\topic{Density Estimation}{Q80--Q91}
+\topic{Density Estimation}{Q77--Q88}
 
 \idea{Bayes classifiers need $p(\mathbf{x}\mid c)$, which must be estimated from
 samples. Either assume a model and fit its parameters (parametric) or let the
@@ -932,7 +927,7 @@ data speak directly (nonparametric). All nonparametric estimators use
 $p(\mathbf{x}) \approx \frac{K}{NV}$ with $K$ of $N$ samples in a volume $V$
 around $\mathbf{x}$: Parzen fixes $V$, $k$-NN fixes $K$.}
 
-\q{80}{What is the difference between parametric and nonparametric methods of
+\q{77}{What is the difference between parametric and nonparametric methods of
 probability estimation?}
 Parametric: assume a functional form $p(\mathbf{x}\mid\boldsymbol\theta)$ (e.g.\
 Gaussian) with a fixed number of parameters and estimate $\boldsymbol\theta$
@@ -941,15 +936,15 @@ Nonparametric: no fixed form; the density is built directly from the samples.
 Flexible (any shape, multimodal), but needs many samples, stores the data, and
 suffers from the curse of dimensionality; model complexity grows with $N$.
 
-\q{81}{What are examples for nonparametric approaches?}
+\q{78}{What are examples for nonparametric approaches?}
 Histograms, Parzen windows / kernel density estimation, $k$-nearest neighbors.
 
-\q{82}{What are examples for parametric approaches?}
+\q{79}{What are examples for parametric approaches?}
 Gaussian (normal) distribution estimated by ML or Bayesian estimation;
 Bernoulli / binomial / multinomial models; exponential distribution; mixtures of
 Gaussians fitted by EM (semi-parametric).
 
-\q{83}{What is the curse of dimensionality?}
+\q{80}{What is the curse of dimensionality?}
 The volume of the feature space grows exponentially with the dimension $D$.
 A histogram with $M$ bins per axis has $M^D$ cells, so the number of samples
 needed to fill them grows exponentially; with a fixed dataset almost all cells
@@ -958,7 +953,7 @@ Nonparametric estimators (and many classifiers) therefore break down in high
 dimensions unless the dimension is reduced or independence is assumed (Naive
 Bayes).
 
-\q{84}{What is the Laplace correction?}
+\q{81}{What is the Laplace correction?}
 Additive smoothing of count-based probability estimates: add one pseudo-count
 to every value,
 \[
@@ -969,12 +964,12 @@ with $n_v$ the count of value $v$, $N$ samples and $K$ possible values. It
 prevents zero probabilities for values unseen in training, which would otherwise
 set the whole Naive Bayes product to zero.
 
-\q{85}{What is ``Parzen Windows''?}
+\q{82}{What is ``Parzen Windows''?}
 A nonparametric density estimation method (kernel density estimation): the
 density at $\mathbf{x}$ is estimated from the samples inside a window (kernel)
 of fixed size $h$ centered at $\mathbf{x}$.
 
-\q{86}{How does Parzen Windows estimate a probability density?}
+\q{83}{How does Parzen Windows estimate a probability density?}
 Fix the volume $V = h^D$ and count the $K$ samples inside:
 $p(\mathbf{x}) \approx \frac{K}{NV}$. Written with a kernel $k$,
 \[
@@ -986,7 +981,7 @@ with a hypercube kernel (count) or, smoother, a Gaussian kernel. Every sample
 places a small bump; the estimate is their average. The bandwidth $h$ controls
 smoothing: small $h$ is spiky (overfitting), large $h$ oversmooths.
 
-\q{87}{How does k-Nearest Neighbors estimate a probability density?}
+\q{84}{How does k-Nearest Neighbors estimate a probability density?}
 Fix $K$ and let the volume adapt: grow a sphere around $\mathbf{x}$ until it
 contains $K$ samples; its volume $V(\mathbf{x})$ gives
 $p(\mathbf{x}) \approx \frac{K}{N\,V(\mathbf{x})}$. Dense regions give small
@@ -994,7 +989,7 @@ volumes, sparse regions large ones. The result is not a proper density (does
 not integrate to 1), but for classification it yields
 $P(c\mid\mathbf{x}) = K_c/K$: majority vote among the $K$ neighbors.
 
-\q{88}{How can a Maximum-likelihood estimator be used to estimate a probability
+\q{85}{How can a Maximum-likelihood estimator be used to estimate a probability
 density?}
 Choose a parametric model $p(\mathbf{x}\mid\boldsymbol\theta)$ and select the
 parameters under which the observed i.i.d.\ samples are most probable:
@@ -1008,7 +1003,7 @@ The logarithm does not change the maximizer and turns the product into a sum.
 Set the gradient to zero and solve; the density estimate is then
 $p(\mathbf{x}\mid\hat{\boldsymbol\theta}_{ML})$.
 
-\q{89}{What is the ML estimate of the parameters of a Gaussian distribution?}
+\q{86}{What is the ML estimate of the parameters of a Gaussian distribution?}
 Sample mean and sample covariance (with $1/N$):
 \[
   \hat{\boldsymbol\mu} = \frac1N\sum_{n=1}^N \mathbf{x}_n, \qquad
@@ -1019,7 +1014,7 @@ Sample mean and sample covariance (with $1/N$):
 In 1D: $\hat\sigma^2 = \frac1N\sum(x_n-\hat\mu)^2$. This variance estimate is
 biased; the unbiased one divides by $N-1$.
 
-\q{90}{What is the basic difference between a ML estimator and a Bayesian
+\q{87}{What is the basic difference between a ML estimator and a Bayesian
 estimation of probability density?}
 ML treats the parameters $\boldsymbol\theta$ as fixed but unknown and returns a
 single point estimate $\hat{\boldsymbol\theta}$. Bayesian estimation treats
@@ -1034,17 +1029,17 @@ and averages over all parameters:
 \noindent
 It includes prior knowledge and the uncertainty about the parameters.
 
-\q{91}{In which case will the ML estimator and the Bayesian estimation lead to
+\q{88}{In which case will the ML estimator and the Bayesian estimation lead to
 the same results?}
 When the posterior $p(\boldsymbol\theta\mid D)$ is sharply peaked at
 $\hat{\boldsymbol\theta}_{ML}$ (approximately a delta function). Then the
-integral in Q90 reduces to $p(\mathbf{x}\mid\hat{\boldsymbol\theta}_{ML})$.
+integral in Q87 reduces to $p(\mathbf{x}\mid\hat{\boldsymbol\theta}_{ML})$.
 This happens for a large number of samples $N\to\infty$ (the likelihood
 dominates) when the prior is not zero at the true value, and in particular for a
 flat (uniform) prior, which makes the posterior mode equal to the ML estimate.
 
 % =====================================================================
-\topic{Graphical Models}{Q92--Q107}
+\topic{Graphical Models}{Q89--Q104}
 
 \idea{A graphical model draws a joint distribution as a graph: nodes are random
 variables, missing edges are conditional independencies. Directed graphs
@@ -1053,21 +1048,21 @@ factorize into clique potentials, equivalently a sum of energies. In images,
 an MRF on the pixel grid combines a data term per pixel with a smoothness term
 between neighbors.}
 
-\q{92}{What are graphical models?}
+\q{89}{What are graphical models?}
 Probabilistic models whose joint distribution is represented by a graph. Nodes
 are random variables; edges express direct probabilistic dependencies; the
 absence of edges encodes conditional independence and thus a factorization of the
 joint into local factors. Types: directed (Bayesian networks), undirected
 (Markov / conditional random fields), factor graphs.
 
-\q{93}{What are typical tasks solved with graphical models?}
+\q{90}{What are typical tasks solved with graphical models?}
 Inference: computing marginals $p(x_i\mid\text{evidence})$ or the most probable
 joint labeling (MAP), plus learning parameters and structure. In image
 analysis: labeling problems with context such as denoising and restoration,
 (semantic) segmentation, stereo matching, optical flow, and classification of
 image regions with neighborhood dependencies.
 
-\q{94}{What is conditional independence?}
+\q{91}{What is conditional independence?}
 $A$ and $B$ are conditionally independent given $C$, written
 $A \perp B \mid C$, if
 \[
@@ -1078,14 +1073,14 @@ $A \perp B \mid C$, if
 Once $C$ is known, $B$ gives no further information about $A$. Example: two
 symptoms are dependent, but independent given the disease.
 
-\q{95}{How to derive a graphical model given a factorization of the joint
+\q{92}{How to derive a graphical model given a factorization of the joint
 probability?}
 Directed: create one node per variable; for each factor $p(x_i\mid
 \text{pa}_i)$ draw an arrow from every conditioning variable in $\text{pa}_i$ to
 $x_i$. Undirected: for each potential $\psi_C(\mathbf{x}_C)$ connect all
 variables in $C$ pairwise, so $C$ becomes a clique.
 
-\q{96}{How to derive a factorization of the joint probability given a graphical
+\q{93}{How to derive a factorization of the joint probability given a graphical
 model?}
 Directed: one factor per node, conditioned on its parents:
 $p(\mathbf{x}) = \prod_i p(x_i\mid\text{pa}_i)$. Undirected: one potential per
@@ -1119,33 +1114,33 @@ per node given its parents. Right: an undirected graph (MRF) with maximal clique
 $\{a,b,c\}$ and $\{b,c,d\}$ and its factorization.}
 \end{figure}
 
-\q{97}{What is a DAG?}
+\q{94}{What is a DAG?}
 A \emph{Directed Acyclic Graph}: all edges are directed and there is no directed
 cycle. It is the graph structure of a Bayesian network; acyclicity guarantees
 that the product of conditionals is a valid joint distribution.
 
-\q{98}{What does MRF stand for?}
+\q{95}{What does MRF stand for?}
 \emph{Markov Random Field}.
 
-\q{99}{What is a clique?}
+\q{96}{What is a clique?}
 A subset of nodes in an undirected graph in which every pair of nodes is
 connected by an edge (fully connected subgraph).
 
-\q{100}{What is a maximum clique?}
+\q{97}{What is a maximum clique?}
 In graphical models: a clique that cannot be extended by adding any further
 node without losing the clique property (strictly, a \emph{maximal} clique; the
 \emph{maximum} clique is the largest clique of the whole graph). MRF potentials
 are defined on these. On a 4-connected pixel grid the maximal cliques are the
 pairs of horizontal and vertical neighbors.
 
-\q{101}{What is the general factorization for a Bayesian Network?}
+\q{98}{What is the general factorization for a Bayesian Network?}
 \[
   p(x_1,\dots,x_n) = \prod_{i=1}^n p(x_i\mid\text{pa}(x_i)),
 \]
 \noindent
 with $\text{pa}(x_i)$ the parents of $x_i$ in the DAG.
 
-\q{102}{What is the general factorization for a MRF?}
+\q{99}{What is the general factorization for a MRF?}
 \[
   p(\mathbf{x}) = \frac{1}{Z}\prod_{C}\psi_C(\mathbf{x}_C), \qquad
   Z = \sum_{\mathbf{x}}\prod_C \psi_C(\mathbf{x}_C),
@@ -1155,7 +1150,7 @@ product over the maximal cliques $C$, potentials $\psi_C\ge0$ (strictly
 positive for the Hammersley--Clifford theorem), and partition function $Z$ for
 normalization. Potentials are not probabilities.
 
-\q{103}{What is the relationship between the potential and the energy of a
+\q{100}{What is the relationship between the potential and the energy of a
 MRF?}
 $\psi_C(\mathbf{x}_C) = \exp(-E_C(\mathbf{x}_C))$, i.e.\ $E_C = -\ln\psi_C$.
 Hence
@@ -1167,7 +1162,7 @@ Hence
 (Gibbs distribution). Products of potentials become sums of energies;
 maximizing the probability (MAP) equals minimizing the energy.
 
-\q{104}{What are unary (association) and binary / pairwise (interaction) energy
+\q{101}{What are unary (association) and binary / pairwise (interaction) energy
 terms (potentials)?}
 Unary (association, data) term $E_i(x_i, \mathbf{y})$: how well label $x_i$
 fits the observation at site $i$, usually $-\ln p(y_i\mid x_i)$ from a local
@@ -1176,7 +1171,7 @@ the label combination of neighboring sites; encodes context / prior, e.g.\ the
 Potts model $E_{ij} = \beta\,[x_i\neq x_j]$, which penalizes label changes
 between neighbors.
 
-\q{105}{How does a typical MRF for image processing look like?}
+\q{102}{How does a typical MRF for image processing look like?}
 \begin{center}
 \begin{tikzpicture}[x=1.5cm, y=1.1cm,
   lab/.style={circle, draw=accent, thick, fill=white, minimum size=6mm, inner sep=0pt},
@@ -1208,10 +1203,10 @@ observation $y_i$ and to its 4 (or 8) neighbors. The energy is
 minimized (MAP labeling) with graph cuts, ICM, belief propagation, or
 simulated annealing. Used for denoising, segmentation, stereo.
 
-\q{106}{What does CRF stand for?}
+\q{103}{What does CRF stand for?}
 \emph{Conditional Random Field}.
 
-\q{107}{What is the basic difference between MRF and CRF?}
+\q{104}{What is the basic difference between MRF and CRF?}
 An MRF is \emph{generative}: it models the joint $p(\mathbf{x},\mathbf{y}) =
 p(\mathbf{y}\mid\mathbf{x})\,p(\mathbf{x})$, the prior $p(\mathbf{x})$ on labels
 is independent of the data, and the observations are assumed conditionally
@@ -1222,26 +1217,26 @@ a contrast-sensitive smoothness term that penalizes label changes less across
 strong image edges.
 
 % =====================================================================
-\topic{Training Neural Networks}{Q108--Q114}
+\topic{Training Neural Networks}{Q105--Q111}
 
 \idea{An MLP is a set of weights and biases; training moves them downhill on the
 loss using gradients from backpropagation. Activation functions supply the
 nonlinearity, and momentum and weight decay make the descent faster and the
 result more general.}
 
-\q{108}{What are the weights in an MLP?}
+\q{105}{What are the weights in an MLP?}
 The learnable parameters on the connections: $w_{ji}$ scales the output $z_i$
 of neuron $i$ before it enters neuron $j$. Their size and sign express how
 strongly and in which direction an input influences a neuron. All knowledge of
 the trained network is stored in weights and biases.
 
-\q{109}{What is the bias term in an MLP?}
+\q{106}{What is the bias term in an MLP?}
 A constant $b_j$ added to the weighted sum, $a_j = \sum_i w_{ji}z_i + b_j$.
 It shifts the activation threshold, i.e.\ moves the decision hyperplane away from
 the origin. Implemented as the weight $w_{j0}$ of an additional input fixed to
 $z_0 = 1$, and learned like any other weight.
 
-\q{110}{What are common activation / transfer functions in an MLP?}
+\q{107}{What are common activation / transfer functions in an MLP?}
 \begin{table}[ht]
   \centering\small
   \begin{tabular}{@{}lll@{}}
@@ -1259,14 +1254,14 @@ $z_0 = 1$, and learned like any other weight.
   \caption{Common activation functions.}
 \end{table}
 
-\q{111}{Which properties do transfer functions in an MLP usually have?}
+\q{108}{Which properties do transfer functions in an MLP usually have?}
 Nonlinear (otherwise the stacked layers collapse into one linear map);
 differentiable, at least almost everywhere (needed for backpropagation);
 monotonically increasing; often bounded / saturating (sigmoid, tanh), which
 squashes outputs into a fixed range; derivatives cheap to compute from the
 function value itself.
 
-\q{112}{What is the update rule for the weights in an MLP?}
+\q{109}{What is the update rule for the weights in an MLP?}
 Gradient descent with learning rate $\eta$:
 \[
   w_{ji}^{(t+1)} = w_{ji}^{(t)} - \eta\,\frac{\partial E}{\partial w_{ji}}
@@ -1276,7 +1271,7 @@ Gradient descent with learning rate $\eta$:
 with $\delta_j$ from backpropagation (Q14) and $z_i$ the input on the
 connection.
 
-\q{113}{What is the difference between online, batch, and offline learning?}
+\q{110}{What is the difference between online, batch, and offline learning?}
 They differ in how many training samples enter one weight update:
 \begin{itemize}
   \item \emph{Online}: update after every single sample
@@ -1289,7 +1284,7 @@ They differ in how many training samples enter one weight update:
 \noindent
 Note: in some texts ``batch'' means offline (full batch).
 
-\q{114}{What is momentum / inertia and weight decay?}
+\q{111}{What is momentum / inertia and weight decay?}
 \emph{Momentum}: add a fraction $\alpha$ of the previous update,
 \[
   \Delta w^{(t)} = -\eta\,\frac{\partial E}{\partial w} + \alpha\,\Delta w^{(t-1)},
@@ -1304,7 +1299,7 @@ Weights shrink unless the data supports them; a regularizer against
 overfitting.
 
 % =====================================================================
-\topic{Convolutional Networks}{Q115--Q120}
+\topic{Convolutional Networks}{Q112--Q117}
 
 \idea{A ConvNet is an MLP adapted to images: neurons only see a local window
 (receptive field) and share the same weights across positions, so a layer is a
@@ -1312,7 +1307,7 @@ convolution. Stacks of convolution, ReLU and pooling extract features; fully
 connected layers classify. Dropout, data augmentation and pre-training fight
 overfitting.}
 
-\q{115}{What is meant by ``receptive field'' and ``shared weights'' in the
+\q{112}{What is meant by ``receptive field'' and ``shared weights'' in the
 context of ConvNets?}
 \emph{Receptive field}: the region of the input image that influences a given
 neuron. Each neuron connects only to a small local neighborhood (e.g.\
@@ -1322,12 +1317,12 @@ kernel weights at every position, so the layer computes a convolution. This
 drastically reduces the number of parameters and makes the features
 translation-equivariant (a pattern is detected wherever it appears).
 
-\q{116}{Which activation function is usually used for ConvNets?}
+\q{113}{Which activation function is usually used for ConvNets?}
 ReLU, $f(a) = \max(0,a)$: cheap, does not saturate for positive inputs (less
 vanishing gradient), sparse activations, faster training. Softmax at the output
 for classification.
 
-\q{117}{What is the basic architecture / layout of a ConvNet?}
+\q{114}{What is the basic architecture / layout of a ConvNet?}
 \begin{center}
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[node distance=3mm,
@@ -1354,7 +1349,7 @@ the number of channels (feature maps) grows; features become more abstract
 (edges $\rightarrow$ textures $\rightarrow$ parts $\rightarrow$ objects).
 Examples: LeNet, AlexNet, VGG.
 
-\q{118}{What is dropout?}
+\q{115}{What is dropout?}
 A regularization technique: during training each neuron's output is set to
 zero with probability $p$ (e.g.\ $0.5$), independently in every iteration.
 Neurons cannot rely on specific other neurons (no co-adaptation), and training
@@ -1362,13 +1357,13 @@ effectively averages an ensemble of thinned networks. At test time all neurons
 are used and activations scaled by $(1-p)$ (or, equivalently, activations are
 scaled by $1/(1-p)$ during training).
 
-\q{119}{What is meant with ``data augmentation''?}
+\q{116}{What is meant with ``data augmentation''?}
 Artificially enlarging the training set with label-preserving transformations
 of the existing samples: flips, random crops and translations, rotations,
 scaling, color and brightness jitter, noise. It reduces overfitting and teaches
 invariance to these transformations.
 
-\q{120}{How does pre-training a ConvNet work?}
+\q{117}{How does pre-training a ConvNet work?}
 Train the network first on a large dataset (e.g.\ ImageNet) for a generic task.
 Then transfer it to the target task with little data: replace the output layer
 to match the new classes, initialize the rest with the pre-trained weights, and
