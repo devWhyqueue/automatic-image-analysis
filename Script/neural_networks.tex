@@ -446,6 +446,11 @@ This is the conceptual core behind PyTorch-style code: zero old gradients,
 evaluate the model, call backward on the loss, and let the optimizer step.
 Poor initialization can make training slow or unstable. Too large a learning
 rate can overshoot; too small a learning rate can make progress painfully slow.
+On a non-convex loss, gradient descent settles in the minimum whose basin
+contains the starting point, so a different initialization can end in a local
+instead of the global minimum. Momentum tends to carry the parameters
+\emph{through} shallow minima; too much of it shows as overshooting and wide
+oscillation, not as clean convergence into a nearby basin.
 
 \subsection{Generalization: Overfitting, Bias, Variance, and Regularization}
 

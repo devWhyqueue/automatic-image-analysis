@@ -674,7 +674,12 @@ The same holds for a regular texture such as a checkerboard: it has the highest
 entropy of a binary patch, but larger windows keep showing the same black/white
 ratio, so there is no peak. A single dark blob on a bright background has lower
 entropy, yet its histogram changes sharply once the window grows past the blob,
-so the blob is the more salient region.
+so the blob is the more salient region. The same argument ranks points within
+one image: the center of a blob is the most salient, because its entropy peaks
+at the scale where the window just encloses the blob. A point on the blob's
+boundary sees roughly half dark and half bright at every window size, so its
+entropy is high from the start but shows no peak over scale; a point in a flat
+region has zero entropy until the window reaches some structure.
 Figure~\ref{fig:saliency-scale} shows the entropy-versus-scale curve with its
 peak, alongside the flat-versus-peaked histogram intuition.
 

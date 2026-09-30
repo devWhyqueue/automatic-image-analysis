@@ -617,6 +617,97 @@ the maximum-entropy patch. Entropy alone is insufficient because the intensity
 distribution contains \textbf{no spatial information}.
 \end{hook}
 
+\sub{Most salient point in one image}
+
+The same idea appears with points instead of patches. Now the trap is not a
+checkerboard but an \textbf{edge}: an edge point has the highest entropy at small
+windows, and that looks attractive.
+
+\begin{question}
+A black disk on a gray background. Point A lies at the disk center, B and C
+lie on its boundary, D lies in the gray area next to it. Saliency is measured as
+the peak of entropy over a local neighborhood \emph{and} scale space. Which point
+is the most salient?
+\end{question}
+\begin{yours}
+C, a point on the boundary, because its small neighborhood is half black and
+half gray: maximum entropy.
+\end{yours}
+\begin{correct}
+A, the center of the disk.
+\end{correct}
+
+\fig{%
+\begin{minipage}[c]{0.28\linewidth}\centering
+\begin{tikzpicture}[scale=0.9]
+  \fill[black!45] (-1.9,-1.9) rectangle (1.9,1.9);
+  \fill[black] (0,0) circle (1);
+  \draw[hookc, thick] (0,0) circle (0.6);
+  \draw[hookc, thick, dashed] (0,0) circle (1.41);
+  \draw[whyc, thick] (1,0) circle (0.45);
+  \draw[whyc, thick, dashed] (1,0) circle (0.8);
+  \draw[rightc, thick] (-1.24,1.24) circle (0.45);
+  \foreach \p/\c/\l/\a in {{(0,0)}/hookc/A/above, {(1,0)}/whyc/C/right,
+      {(-1.24,1.24)}/rightc/D/above}
+    \fill[\c] \p circle (2pt) node[\a, font=\sffamily\small\bfseries, text=white] {\l};
+\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.7\linewidth}\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth, height=5.2cm, xmin=0, xmax=3.05, ymin=-0.05, ymax=1.15,
+    xlabel={window radius $s$ (disk radius $=1$)}, ylabel={entropy $H_D(s)$},
+    axis lines=left, tick label style={font=\scriptsize}, label style={font=\small},
+    legend style={font=\sffamily\scriptsize, draw=none, at={(0.98,0.98)}, anchor=north east},
+    legend cell align=left]
+  \addplot[very thick, hookc] coordinates {(0.05,0) (1.00,0) (1.05,0.446) (1.10,0.666)
+    (1.15,0.801) (1.20,0.888) (1.25,0.943) (1.30,0.976) (1.35,0.993) (1.40,1.000)
+    (1.50,0.991) (1.60,0.965) (1.70,0.930) (1.80,0.892) (1.90,0.851) (2.00,0.811)
+    (2.20,0.735) (2.40,0.666) (2.60,0.605) (2.80,0.551) (3.00,0.503)};
+  \addplot[very thick, whyc] coordinates {(0.05,1.000) (0.20,0.999) (0.40,0.995)
+    (0.60,0.988) (0.80,0.978) (1.00,0.965) (1.20,0.949) (1.40,0.927) (1.60,0.900)
+    (1.80,0.864) (2.00,0.811) (2.20,0.735) (2.40,0.666) (2.60,0.605) (2.80,0.551)
+    (3.00,0.503)};
+  \addplot[very thick, rightc] coordinates {(0.05,0) (0.75,0) (0.80,0.060)
+    (0.90,0.191) (1.00,0.295) (1.20,0.436) (1.40,0.520) (1.60,0.570) (1.80,0.598)
+    (2.00,0.612) (2.20,0.615) (2.40,0.607) (2.60,0.589) (2.80,0.551) (3.00,0.503)};
+  \legend{A: center, C: boundary, D: outside}
+  \addplot[only marks, mark=*, mark size=2.5pt, hookc, forget plot] coordinates {(1.40,1)};
+\end{axis}
+\end{tikzpicture}
+\end{minipage}}{Left: windows of growing size around A, C, and D. Right:
+entropy of the black/gray histogram inside each window. A has zero entropy until
+the window leaves the disk, then a sharp peak at the disk's scale. C starts at
+maximum entropy and only decays: no peak over scale. D reaches only a low, broad
+bump once its window touches the disk.}
+
+\begin{why}
+The question says \emph{peak} over scale, so it asks for Kadir--Brady saliency,
+$y = H_D(s_p)\cdot W_D(s_p)$. At an edge point the histogram is about 50/50 for
+every small window, so it barely changes with scale: $W_D\approx 0$ and there is
+no peak $s_p$ at all. An edge is self-similar across scale, like the
+checkerboard. The disk center has a clear characteristic scale, the disk radius,
+where the histogram changes fastest.
+\end{why}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Keyword check: ``scale space'' or ``peak'' in the question means
+        Kadir--Brady, not plain entropy at one window size.
+  \item For every point, grow a window from tiny to large and sketch the entropy
+        curve: starts at 0 or at a high value? Rises, then falls?
+  \item Discard curves that start at their maximum (edge points) or stay flat
+        (uniform regions, regular texture).
+  \item Among the curves with a real peak, pick the one whose histogram changes
+        most sharply around the peak: the center of a compact blob.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+Salient point $=$ \textbf{center of a blob}, never a point on its edge. High
+entropy at small scale without a peak is edge-like, not salient.
+\end{hook}
+
 % =================================================================
 \clearpage
 \topic{Hough Transform and Template Matching}{}\label{sec:hough}
@@ -1334,6 +1425,53 @@ over the mean waiting time.}
 \textbf{Counts} $\to$ mean. \textbf{Waiting times} $\to$ one over the mean.
 \end{hook}
 
+\sub{Which functions have the same maximizer as the likelihood?}
+
+\begin{question}
+Poisson counts $k_1,\dots,k_n$. Which functions have their extremum at
+$\lambda_\text{MLE}$?\\[2pt]
+$L_1=e^{-n\lambda}\prod_i\frac{\lambda^{k_i}}{k_i!}$,\quad
+$L_2=\prod_i\frac{\lambda^{k_i}}{k_i!}$,\quad
+$L_3=-n\lambda+\log\lambda\sum_ik_i$,\quad
+$L_4=-n\lambda-\sum_i\log k_i!+\log\lambda\sum_ik_i$
+\end{question}
+\begin{yours}
+$L_1$ and $L_4$ ticked, $L_3$ missed.
+\end{yours}
+\begin{correct}
+$L_1$, $L_3$, $L_4$.
+\end{correct}
+
+\begin{why}
+The maximizer $\arg\max_\lambda$ only cares about the \emph{shape} of the
+function in $\lambda$. Three operations never move it:
+\begin{itemize}[leftmargin=*]
+  \item a strictly increasing transformation ($\log$, $\exp$, $\sqrt{\cdot}$);
+  \item adding or dropping a term that does not contain $\lambda$;
+  \item multiplying by a positive constant that does not contain $\lambda$.
+\end{itemize}
+Anything that removes or changes a $\lambda$-dependent part does move it.
+\end{why}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Write the true likelihood: $L(\lambda)=\prod_i\lambda^{k_i}e^{-\lambda}/k_i!
+        =e^{-n\lambda}\prod_i\lambda^{k_i}/k_i!$. This is exactly $L_1$. \ok
+  \item Take the log: $\ell=-n\lambda+\log\lambda\sum_ik_i-\sum_i\log k_i!$. This
+        is $L_4$. \ok
+  \item $L_3=L_4+\sum_i\log k_i!$. The added term is a constant in $\lambda$. \ok
+  \item $L_2=L_1\cdot e^{n\lambda}$. The factor depends on $\lambda$, so the shape
+        changes: $L_2$ grows without bound, no maximum at $\bar k$. \bad
+  \item Cross-check by differentiating the log-forms: $L_3'=L_4'=-n+\sum_ik_i/\lambda$,
+        zero at $\bar k$. Same derivative $\Rightarrow$ same extremum.
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+For every candidate ask: \textbf{what differs from $L$ or $\log L$?} A constant
+in $\lambda$ $\to$ same maximizer. Something with $\lambda$ in it $\to$ different.
+\end{hook}
+
 \sub{Bias, variance, and MSE of estimators}
 
 \begin{question}
@@ -1388,6 +1526,62 @@ C scatters $N$ times more (variance $\sigma^2$ vs.\ $\sigma^2/N$).}
 \begin{hook}
 A constant has \textbf{zero variance} but can have huge bias. Lowest MSE depends
 on the unknown $\mu$, so ``always'' fails.
+\end{hook}
+
+\sub{Comparing two estimators by bias and variance}
+
+\begin{question}
+Two estimators $\hat f_1,\hat f_2$. Which statements are true?
+(a) Equal bias, $\mathrm{Var}(\hat f_1)>\mathrm{Var}(\hat f_2)=1$ $\Rightarrow$
+$\hat f_1$ better.
+(b) $\hat f_1$ lower bias and lower variance $\Rightarrow$ $\hat f_2$ better.
+(c) $\hat f_1$ higher bias and higher variance $\Rightarrow$ $\hat f_2$ better.
+(d) Bias $1$, Var $5$ for $\hat f_1$; bias $2$, Var $1$ for $\hat f_2$
+$\Rightarrow$ $\hat f_2$ better.
+\end{question}
+\begin{yours}
+Only (c) ticked; (d) missed. Lower bias looked like the deciding advantage of
+$\hat f_1$.
+\end{yours}
+\begin{correct}
+(c) and (d).
+\end{correct}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item ``Better'' means \textbf{lower MSE}. Write
+        $\mathrm{MSE}=\mathrm{Bias}^2+\mathrm{Var}$ before looking at the options.
+  \item \textbf{Dominance cases} (one estimator at least as good in both terms):
+        decide without numbers. (a) equal bias, larger variance $\Rightarrow$
+        $\hat f_1$ \emph{worse} \bad. (b) $\hat f_1$ better in both $\Rightarrow$
+        $\hat f_1$ better \bad. (c) $\hat f_2$ better in both \ok.
+  \item \textbf{Trade-off cases} (one better in bias, the other in variance):
+        always compute. (d) $1^2+5=6$ versus $2^2+1=5$ $\Rightarrow$ $\hat f_2$
+        better \ok.
+  \item Square the bias. Without squaring, (d) would give $6$ vs.\ $3$: same
+        verdict here, but not in general (bias $3$, Var $0$: MSE $9$, not $3$).
+\end{enumerate}
+\end{steps}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.62\linewidth, height=4.2cm, xbar stacked, bar width=14pt,
+    xmin=0, xmax=7, ytick={1,2}, yticklabels={$\hat f_1$, $\hat f_2$},
+    xlabel={MSE}, axis lines=left, enlarge y limits=0.5,
+    tick label style={font=\small}, label style={font=\small},
+    legend style={font=\sffamily\scriptsize, draw=none, at={(1.02,0.5)}, anchor=west},
+    legend cell align=left]
+  \addplot[fill=hookc!60, draw=hookc] coordinates {(1,1) (4,2)};
+  \addplot[fill=whyc!50, draw=whyc] coordinates {(5,1) (1,2)};
+  \legend{bias$^2$, variance}
+\end{axis}
+\end{tikzpicture}}{Option (d) as stacked bars. $\hat f_2$ has twice the bias,
+but its total error is smaller.}
+
+\begin{hook}
+Neither lower bias nor lower variance alone makes an estimator better. If
+neither estimator dominates, \textbf{compute $\mathrm{Bias}^2+\mathrm{Var}$}.
 \end{hook}
 
 % =================================================================
@@ -1586,6 +1780,64 @@ approximately in the direction of the full gradient'' was missed.
   \bottomrule
 \end{tabularx}
 \end{center}
+
+\sub{Reading a gradient-descent trajectory}
+
+\begin{question}
+Two contour plots of the same loss, global optimum in the center. Run 1 reaches
+it. Run 2 starts at a different point, curls in a small spiral, and stops in a
+local minimum above the center. Possible reasons? Bad starting point / too large
+momentum / too large learning rate / too many update steps.
+\end{question}
+\begin{yours}
+``Bad starting point'' and ``too large momentum'' ticked; the spiral looked like
+momentum.
+\end{yours}
+\begin{correct}
+Only ``bad starting point''.
+\end{correct}
+
+\fig{%
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.8\linewidth, height=5cm, domain=-4:4, samples=200,
+    xlabel={parameter $w$}, ylabel={loss}, axis lines=left,
+    xtick=\empty, ytick=\empty, ymin=-1.3, ymax=2.9,
+    label style={font=\small}]
+  \addplot[very thick, accent] {x^2/8 - cos(deg(2*x))};
+  \addplot[only marks, mark=*, mark size=3pt, rightc] coordinates {(1.2,{1.2^2/8-cos(deg(2.4))})};
+  \addplot[only marks, mark=*, mark size=3pt, wrongc] coordinates {(2.2,{2.2^2/8-cos(deg(4.4))})};
+  \draw[-{Latex[length=2mm]}, rightc, thick] (axis cs:1.1,0.95) to[bend right=20] (axis cs:0.15,-0.7);
+  \draw[-{Latex[length=2mm]}, wrongc, thick] (axis cs:2.35,1.05) to[bend left=20] (axis cs:3.0,0.3);
+  \node[font=\sffamily\scriptsize, text=rightc, anchor=south] at (axis cs:1.0,1.55) {start 1};
+  \node[font=\sffamily\scriptsize, text=wrongc, anchor=south] at (axis cs:2.3,1.55) {start 2};
+  \node[font=\sffamily\scriptsize, anchor=west] at (axis cs:0.3,-0.95) {global};
+  \node[font=\sffamily\scriptsize, anchor=north] at (axis cs:3.05,-0.05) {local};
+\end{axis}
+\end{tikzpicture}}{One-dimensional cut through such a loss. Gradient descent
+flows downhill into the basin that contains the start. Start 2 lies on the far
+side of the ridge, so it can only reach the local minimum.}
+
+\begin{steps}
+\begin{enumerate}[leftmargin=*]
+  \item Compare the start points of the two runs. Different start, different
+        basin: ``bad starting point'' \ok.
+  \item Momentum: a small spiral that settles \emph{inside} a basin is normal
+        momentum behavior. Too large momentum overshoots: it would carry the
+        path \emph{out} of a small basin, not trap it there. Momentum helps
+        escape shallow minima. \bad
+  \item Learning rate: too large makes the path jump or diverge, visible as
+        long zig-zags across contour lines. Here the steps are small. \bad
+  \item Number of steps: more steps never pull a converged run out of a
+        minimum; the gradient there is zero. \bad
+\end{enumerate}
+\end{steps}
+
+\begin{hook}
+\textbf{Stuck cleanly in a local minimum} $\to$ starting point.
+\textbf{Overshooting, wild oscillation} $\to$ learning rate or momentum too
+large. A tight spiral is momentum doing its job.
+\end{hook}
 
 \sub{Universal approximation}
 
@@ -2057,6 +2309,7 @@ of the exam.
   $\square$ & Histogram axis orientation fixed with the unambiguous patch? \\
   $\square$ & Entropy only depends on bar heights (swap, shuffle, mirror keep it)? \\
   $\square$ & Saliency: entropy \emph{peak over scale}, not maximum entropy? \\
+  $\square$ & Salient point: blob center, not an edge point (edge $=$ no peak)? \\
   \cgroup{Hough and template matching}
   $\square$ & $\rho = x\cos\theta + y\sin\theta$ computed for every candidate? \\
   $\square$ & Votes $=$ product of bins of the \emph{free} parameters only? \\
@@ -2070,12 +2323,15 @@ of the exam.
   $\square$ & ``Expected'' value: is $x$ integrated out? \\
   \cgroup{Estimation}
   $\square$ & MLE: log-likelihood, derivative, solve; answer is the parameter? \\
+  $\square$ & Same maximizer: only terms constant in the parameter added or dropped? \\
   $\square$ & Probability inside $[0,1]$? Waiting times $\to 1/\bar k$? \\
   $\square$ & MSE $=$ bias$^2$ $+$ variance; ``always lowest MSE'' tested? \\
+  $\square$ & Lower bias vs.\ lower variance: MSE computed, bias squared? \\
   \cgroup{Neural networks}
   $\square$ & Backprop memory $\propto$ stored activations, not parameters? \\
-  $\square$ & MSE vs.\ MAE gradient: compared $2|e|$ with $1$? \\
+  $\square$ & MSE vs.\ MAE gradient: factor $\tfrac12$ checked, then $2|e|$ or $|e|$ vs.\ $1$? \\
   $\square$ & SGD: cheaper steps, not fewer steps? \\
+  $\square$ & Run stuck cleanly in a local minimum: starting point, not momentum? \\
   $\square$ & Universal approximation: continuous on compact domain, existence only? \\
   $\square$ & Underfitting $\to$ wider/deeper; overfitting $\to$ more data/regularize? \\
   \cgroup{CNNs}

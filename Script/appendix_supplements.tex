@@ -418,7 +418,11 @@ A constant has zero variance, the lowest possible, and a single sample the
 highest. The sample mean has the lowest MSE only as long as
 $\sigma^2/N < \mu^2$: if the true mean happens to be close to $0$, the useless
 constant $\hat\mu_A$ wins. So no estimator is ``always'' best in MSE; an
-unbiased one is merely the safe default.
+unbiased one is merely the safe default. When two estimators are compared, the
+sum decides, not bias or variance alone: bias $1$ with variance $5$ gives
+$\mathrm{MSE}=6$, bias $2$ with variance $1$ gives $\mathrm{MSE}=5$, so the more
+biased estimator is better. Only an estimator that is at least as good in both
+$\lvert\text{bias}\rvert$ and variance wins without computing.
 
 \paragraph{Squared versus absolute error.}
 For a prediction $y$ and target $y_{GT}$ with error $e = y - y_{GT}$, the squared
@@ -434,7 +438,9 @@ of size
 The squared error pushes harder on large errors and more gently on small ones;
 the two gradients are equal exactly at $\lvert e\rvert = 0.5$. This is why the
 squared error is sensitive to outliers, while the absolute error keeps a constant
-pull even when the prediction is almost right.
+pull even when the prediction is almost right. With the common form
+$\ell_1 = \tfrac12 e^2$ the gradient is $\lvert e\rvert$, and the two gradients
+are equal at $\lvert e\rvert = 1$ instead.
 \begin{center}
   \begin{tabular}{@{}ccccc@{}}
     \toprule

@@ -630,7 +630,11 @@ the model}, and the ML estimate is the model that makes the observed data most
 probable: the one that best explains them. In practice one maximizes the
 \emph{log-likelihood} $\ell(\theta) = \sum_k \ln p(x_k\mid\theta)$, which has the
 same maximum and turns the product into a sum, by setting its derivative to
-zero. The recipe for every exercise of this kind is: write down $\ell(\theta)$,
+zero. More generally, the maximizer stays the same under any strictly
+increasing transformation (such as $\ln$), when a term that does not depend on
+$\theta$ is added or dropped, and when the function is multiplied by a positive
+constant. Dropping a factor that \emph{does} depend on $\theta$ moves the
+maximizer. The recipe for every exercise of this kind is: write down $\ell(\theta)$,
 differentiate, set to zero, solve.
 
 For a Gaussian, $\ell(\mu) = \sum_k \bigl[-\frac12\ln(2\pi\sigma^2)
